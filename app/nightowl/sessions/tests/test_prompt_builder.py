@@ -28,6 +28,11 @@ class TestMainPrompt:
         assert "do NOT" in prompt
         assert "poll" in prompt.lower()
 
+    def test_includes_proactive_spawn_rule(self):
+        prompt = build_system_prompt(_make_session(SessionRole.MAIN))
+        assert "AUTONOMOUS SPAWNING" in prompt
+        assert "Research" in prompt
+
     def test_includes_skills_when_provided(self):
         prompt = build_system_prompt(
             _make_session(SessionRole.MAIN),
@@ -71,6 +76,12 @@ class TestOrchestratorPrompt:
             _make_session(SessionRole.ORCHESTRATOR, depth=1, parent_id="session:parent")
         )
         assert "do NOT" in prompt
+
+    def test_includes_proactive_spawn_rule(self):
+        prompt = build_system_prompt(
+            _make_session(SessionRole.ORCHESTRATOR, depth=1, parent_id="session:parent")
+        )
+        assert "AUTONOMOUS SPAWNING" in prompt
 
 
 class TestLeafPrompt:

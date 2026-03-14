@@ -45,6 +45,28 @@ _SANDBOX_RULE = (
     " https:// URLs for git clone/push and authentication is handled automatically."
 )
 
+_PROACTIVE_SPAWN_RULE = (
+    "AUTONOMOUS SPAWNING: You should proactively spawn child agents whenever a task"
+    " would benefit from parallel work, deeper investigation, or separation of concerns."
+    " Do NOT wait for the user to ask you to delegate — decide on your own.\n\n"
+    "Spawn children when you recognize any of these situations:\n"
+    "- **Research & exploration**: Investigating a topic, codebase, API, or dataset."
+    "  Spawn one child per angle of investigation so they can search in parallel.\n"
+    "- **Compare & evaluate**: Comparing options, tools, approaches, or implementations."
+    "  Spawn one child per option to research independently, then synthesize results.\n"
+    "- **Multi-step plans**: A task has 2+ independent steps. Run them concurrently.\n"
+    "- **Uncertain scope**: You're unsure how deep a rabbit hole goes. Spawn a child"
+    "  to explore it so your own context stays clean for the user.\n"
+    "- **Read-heavy tasks**: Summarizing docs, reading long files, scanning repos."
+    "  Offload to a child so your context isn't consumed by raw content.\n"
+    "- **Verification**: After producing a result, spawn a child to verify or test it"
+    "  independently.\n\n"
+    "When spawning, write a focused task description that gives the child everything it"
+    " needs to work autonomously: goal, context, constraints, and what output you expect back."
+    " Short labels help the user see what's happening (e.g. 'research-auth-libraries',"
+    " 'scan-repo-structure', 'verify-migration')."
+)
+
 
 def build_system_prompt(session: Session, skills_prompt: str | None = None) -> str:
     parts: list[str] = []
@@ -54,6 +76,7 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
         parts.append(_RELAY_RULE)
         parts.append(_AUTH_RULE)
         parts.append(_SANDBOX_RULE)
+        parts.append(_PROACTIVE_SPAWN_RULE)
         if skills_prompt:
             parts.append(f"Available skills and integrations:\n{skills_prompt}")
         parts.append(
@@ -71,11 +94,11 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
         parts.append(_RELAY_RULE)
         parts.append(_AUTH_RULE)
         parts.append(_SANDBOX_RULE)
+        parts.append(_PROACTIVE_SPAWN_RULE)
         parts.append(f"Your task: {session.task}")
         parts.append(f"Depth: {session.depth} | Role: orchestrator | Parent: {session.parent_id}")
         parts.append(
-            "You can spawn further child sessions if needed."
-            " You have session tools: sessions_spawn, sessions_list, sessions_send,"
+            "You have session tools: sessions_spawn, sessions_list, sessions_send,"
             " sessions_complete. Use sessions_send to message your parent with questions,"
             " progress updates, or partial results. Use sessions_complete to dismiss a"
             " child when you're done with it. Children stay alive until you complete them."
