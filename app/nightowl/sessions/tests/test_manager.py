@@ -220,6 +220,6 @@ class TestBroadcastEvents:
 class TestCleanup:
     async def test_cleanup_removes_session_and_queue(self, manager: SessionManager):
         session = await manager.create_main_session("task")
-        manager.cleanup_session(session.id)
+        await manager.cleanup_session(session.id)
         assert manager.get_session(session.id) is None
         assert manager.get_queue(session.id) is None

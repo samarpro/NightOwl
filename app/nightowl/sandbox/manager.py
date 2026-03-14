@@ -74,11 +74,11 @@ def _fetch_composio_credentials() -> dict[str, str]:
     return env
 
 
-_GIT_CREDENTIAL_SETUP = (
-    'git config --global credential.helper '
-    "'!f() { echo \"protocol=https\"; echo \"host=github.com\"; "
-    "echo \"username=x-access-token\"; echo \"password=$GITHUB_TOKEN\"; }; f'"
-)
+_GIT_CREDENTIAL_SCRIPT = """\
+printf "#!/bin/sh\\necho protocol=https\\necho host=github.com\\necho username=x-access-token\\necho password=%s\\n" "$GITHUB_TOKEN" > /usr/local/bin/git-credential-nightowl \
+&& chmod +x /usr/local/bin/git-credential-nightowl \
+&& git config --global credential.helper /usr/local/bin/git-credential-nightowl
+"""
 
 
 class DockerSandboxManager:
@@ -128,7 +128,7 @@ class DockerSandboxManager:
 
         # Configure git credential helper if we injected a GitHub token
         if "GITHUB_TOKEN" in cred_env:
-            await self.exec_command(container_id, _GIT_CREDENTIAL_SETUP)
+            await self.exec_command(container_id, _GIT_CREDENTIAL_SCRIPT)
 
         return container_id
 
