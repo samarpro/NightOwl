@@ -21,6 +21,7 @@ from nightowl.db import close_db, init_db
 from nightowl.events import RuntimeBroadcaster
 from nightowl.hitl.gate import HITLGate
 from nightowl.ingest.service import IngressService
+from nightowl.sandbox.manager import DockerSandboxManager
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.runner import run_child_session
 from nightowl.sessions.store import SessionStore
@@ -48,6 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     gate = HITLGate(manager=manager, event_bus=broadcaster, registry=registry)
     manager.hitl_gate = gate
     manager.channel_registry = registry
+    manager.sandbox_manager = DockerSandboxManager()
 
     ingress_service = IngressService(manager=manager, registry=registry)
 

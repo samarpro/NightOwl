@@ -22,6 +22,7 @@ class AgentState:
     channel_registry: Any = None  # Optional ChannelRegistry instance
     store: Any = None  # Optional SessionStore instance
     mcp_servers: list[Any] = field(default_factory=list)
+    sandbox_manager: Any = None  # Optional DockerSandboxManager instance
 
 
 async def sessions_spawn(

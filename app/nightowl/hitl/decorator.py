@@ -18,12 +18,14 @@ The decorator:
 from __future__ import annotations
 
 import functools
+import inspect
 import logging
+import sys
 from typing import Any
 
 from pydantic_ai import RunContext
 
-from nightowl.hitl.classifier import verify_risk
+from nightowl.hitl.classifier import verify_risk as _default_verify_risk
 from nightowl.models.approval import RiskLevel
 from nightowl.sessions.tools import AgentState
 
@@ -53,7 +55,11 @@ def hitl_gated(fn: Any) -> Any:
             try:
                 tool_name = fn.__name__
                 tool_args = {k: v for k, v in kwargs.items()}
-                classification = await verify_risk(
+                # Resolve verify_risk from the wrapped function's module so
+                # tests can patch it at the tool's import location.
+                fn_module = sys.modules.get(fn.__module__)
+                _verify_risk = getattr(fn_module, "verify_risk", _default_verify_risk)
+                classification = await _verify_risk(
                     tool_name=tool_name,
                     tool_args=tool_args,
                     self_reported_risk=parsed_risk,

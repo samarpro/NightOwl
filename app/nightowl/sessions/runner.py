@@ -22,7 +22,7 @@ logfire.instrument_pydantic_ai()
 
 from nightowl.composio_tools.meta_tools import composio_execute, composio_search_tools
 from nightowl.sessions.context_compaction import create_compaction_processor, truncate_tool_results
-from nightowl.models.session import SandboxMode, Session, SessionRole, SessionState
+from nightowl.models.session import Session, SessionRole, SessionState
 from nightowl.sandbox.bash_tool import bash_exec
 from nightowl.sandbox.browser_tool import browser_interact, browser_navigate, browser_screenshot
 from nightowl.sandbox.computer_use_tool import computer_use_action, computer_use_screenshot
@@ -78,19 +78,13 @@ def _build_agent(session: Session, system_prompt: str) -> Agent[AgentState, str]
     agent.tool(composio_search_tools)
     agent.tool(composio_execute)
 
-    # Sandbox tools — registered based on the session's sandbox mode
-    mode = session.sandbox_mode
-    if mode == SandboxMode.CLI:
-        agent.tool(bash_exec)
-    elif mode == SandboxMode.BROWSER:
-        agent.tool(bash_exec)
-        agent.tool(browser_navigate)
-        agent.tool(browser_interact)
-        agent.tool(browser_screenshot)
-    elif mode == SandboxMode.COMPUTER:
-        agent.tool(bash_exec)
-        agent.tool(computer_use_screenshot)
-        agent.tool(computer_use_action)
+    # Sandbox tools — always available; containers are created lazily on first use
+    agent.tool(bash_exec)
+    agent.tool(browser_navigate)
+    agent.tool(browser_interact)
+    agent.tool(browser_screenshot)
+    agent.tool(computer_use_screenshot)
+    agent.tool(computer_use_action)
 
     return agent
 
