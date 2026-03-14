@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 
 class Message(BaseModel):
@@ -17,3 +19,8 @@ class ChannelMessage(BaseModel):
     sender_id: str
     text: str
     thread_id: str | None = None
+    chat_id: str | None = None
+    message_id: str | None = None
+    sender_display_name: str | None = None
+    received_at: datetime | None = None
+    metadata: dict[str, str] = Field(default_factory=dict)

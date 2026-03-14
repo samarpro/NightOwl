@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     # Channel tokens
     telegram_bot_token: str = ""
+    telegram_webhook_secret: str = ""
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
 
     # Database
-    database_url: str = "postgresql+asyncpg://localhost:5432/nightowl"
+    database_url: str = "sqlite+aiosqlite:///./nightowl.db"
 
     # Session limits
     max_spawn_depth: int = 3

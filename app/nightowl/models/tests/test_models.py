@@ -102,8 +102,10 @@ class TestTaskCompletionEvent:
 
 class TestMessageModels:
     def test_channel_message(self):
-        msg = ChannelMessage(channel="telegram", sender_id="user123", text="hello")
+        msg = ChannelMessage(channel="telegram", sender_id="user123", text="hello", chat_id="chat1")
         assert msg.thread_id is None
+        assert msg.chat_id == "chat1"
+        assert msg.metadata == {}
 
     def test_message_round_trip(self):
         msg = Message(session_id="session:x", role="user", content="hello agent")

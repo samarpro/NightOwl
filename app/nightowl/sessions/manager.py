@@ -44,7 +44,7 @@ class SessionManager:
 
     # ── Session creation ──────────────────────────────────────────
 
-    async def create_main_session(self, task: str) -> Session:
+    async def create_main_session(self, task: str, channel: str | None = None) -> Session:
         session_id = f"session:{uuid.uuid4().hex[:12]}"
         session = Session(
             id=session_id,
@@ -55,7 +55,7 @@ class SessionManager:
         )
         self._sessions[session_id] = session
         self._queues[session_id] = asyncio.Queue()
-        await self._emit({"type": "session:created", "session": session.model_dump()})
+        await self._emit({"type": "session:created", "session": session.model_dump(), "channel": channel})
         return session
 
     async def spawn_child(
