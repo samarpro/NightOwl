@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 from nightowl.config import settings
@@ -102,7 +102,6 @@ class HITLGate:
         """
         approval_id = f"approval:{uuid.uuid4().hex[:12]}"
         event = asyncio.Event()
-        expires_at = datetime.now(UTC) + timedelta(seconds=self._timeout_seconds)
         channel_info = self._resolve_channel(session_id)
         result: dict[str, Any] = {
             "approved": False,
@@ -121,7 +120,6 @@ class HITLGate:
             "tool_args": tool_args,
             "risk_level": risk_level,
             "channel": channel_info["channel"] if channel_info else None,
-            "expires_at": expires_at.isoformat(),
         })
 
         # Send to user's last messaging channel if available
@@ -134,19 +132,8 @@ class HITLGate:
                 risk_level=risk_level,
             )
 
-        # Wait for resolution or timeout
-        try:
-            await asyncio.wait_for(event.wait(), timeout=self._timeout_seconds)
-        except asyncio.TimeoutError:
-            log.warning("Approval %s timed out after %.1fs", approval_id, self._timeout_seconds)
-            await self._broadcast_event({
-                "type": "approval:timeout",
-                "approval_id": approval_id,
-                "session_id": session_id,
-                "channel": channel_info["channel"] if channel_info else None,
-            })
-            self._pending.pop(approval_id, None)
-            return False
+        # Wait indefinitely for the human to respond
+        await event.wait()
 
         approved = result["approved"]
         self._pending.pop(approval_id, None)
