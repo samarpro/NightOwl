@@ -11,6 +11,8 @@ import json
 import logging
 from typing import Any
 
+from pydantic import BaseModel
+
 from nightowl.config import settings
 from nightowl.models.approval import RiskLevel
 
@@ -53,8 +55,13 @@ def _build_prompt(
     return "\n".join(parts)
 
 
+class RiskVerification(BaseModel):
+    verified_risk: str
+    reasoning: str
+
+
 async def _call_haiku(system: str, prompt: str) -> dict[str, Any]:
-    """Call Haiku via Bedrock and parse the JSON response."""
+    """Call Haiku via Bedrock with typed output."""
     from pydantic_ai import Agent
     from pydantic_ai.models.bedrock import BedrockConverseModel
     from pydantic_ai.providers.bedrock import BedrockProvider
@@ -64,9 +71,11 @@ async def _call_haiku(system: str, prompt: str) -> dict[str, Any]:
         api_key=settings.bedrock_api_key or None,
     )
     model = BedrockConverseModel(model_name=_HAIKU_MODEL, provider=provider)
-    agent: Agent[None, str] = Agent(model=model, system_prompt=system)
+    agent: Agent[None, RiskVerification] = Agent(
+        model=model, system_prompt=system, output_type=RiskVerification,
+    )
     result = await agent.run(prompt)
-    return json.loads(result.output)
+    return result.output.model_dump()
 
 
 async def verify_risk(
