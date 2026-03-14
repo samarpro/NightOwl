@@ -248,6 +248,12 @@ async def process_runtime_message(
     return output
 
 
+def _schedule_intent(manager: SessionManager, session_id: str) -> None:
+    intent_graph = getattr(manager, "intent_graph", None)
+    if intent_graph:
+        intent_graph.schedule_processing(session_id)
+
+
 async def run_child_session(session: Session, manager: SessionManager) -> None:
     """Entry point for background child sessions.
 
@@ -270,6 +276,7 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
     await manager._emit({"type": "session:running", "session_id": session.id, "session": session.model_dump()})
 
     output, history = await _iter_agent(agent, session.task, deps, None, manager._emit)
+    _schedule_intent(manager, session.id)
 
     # Stay alive — persistent child session
     queue = manager.get_queue(session.id)
@@ -285,6 +292,7 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
             session.state = SessionState.RUNNING
             await manager._emit({"type": "session:running", "session_id": session.id, "session": session.model_dump()})
             output, history = await _iter_agent(agent, msg, deps, history, manager._emit)
+            _schedule_intent(manager, session.id)
 
     await manager.complete_session(session.id, output)
 

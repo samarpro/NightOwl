@@ -32,10 +32,7 @@ Respond with:
 - service: the external service or system involved (e.g. "gmail", "calendar", "web-search", "internal")
 - intent: what the agent is trying to accomplish (e.g. "fetch-emails", "check-availability", "search-restaurants")
 - status: "in_progress", "completed", "failed", or "waiting"
-- summary: a detailed 2-4 sentence description of what happened in this step. \
-Include what the agent decided to do, which tools it called and why, \
-what data it received or produced, and the outcome. \
-This summary is the primary way users understand what the agent did — be specific and informative."""
+- summary: one-sentence description of what happened"""
 
 
 class ClassifiedIntent(BaseModel):

@@ -1,4 +1,4 @@
-import { useMutation, useQueries } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { memo, useEffect, useMemo, useState, type CSSProperties } from "react";
 import ReactFlow, {
   Background,
@@ -17,13 +17,13 @@ import {
   buildSessionGraph,
   type SessionCanvasNodeData
 } from "features/session-canvas/model/build-session-graph";
-import { fetchSessionMessages } from "shared/api/sessions";
 import { correctShadow, createShadow, messageShadow } from "shared/api/shadow";
 import robotIcon from "shared/assets/robot.svg";
 
 type SessionCanvasProps = {
   selectedSession: SessionNode;
   sessions: SessionNode[];
+  onSelectAgent: (sessionId: string) => void;
 };
 
 const nodeTypes = {
@@ -34,25 +34,14 @@ const edgeTypes = {
   sessionCanvasEdge: memo(SessionCanvasEdge)
 };
 
-export function SessionCanvas({ selectedSession, sessions }: SessionCanvasProps) {
-  const [expandedToolCallIds, setExpandedToolCallIds] = useState<Set<string>>(() => new Set());
-  const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null);
+export function SessionCanvas({ selectedSession, sessions, onSelectAgent }: SessionCanvasProps) {
+  const [shadowAgentSessionId, setShadowAgentSessionId] = useState<string | null>(null);
   const [shadowInput, setShadowInput] = useState("");
   const [shadowReply, setShadowReply] = useState<string | null>(null);
   const [shadowIdsBySession, setShadowIdsBySession] = useState<Record<string, string>>({});
-  const messageQueries = useQueries({
-    queries: sessions.map((session) => ({
-      queryKey: ["sessions", session.id, "messages"],
-      queryFn: () => fetchSessionMessages(session.id)
-    }))
-  });
 
   useEffect(() => {
-    setExpandedToolCallIds(new Set());
-  }, [selectedSession.id]);
-
-  useEffect(() => {
-    setActiveAgentSessionId(null);
+    setShadowAgentSessionId(null);
     setShadowInput("");
     setShadowReply(null);
   }, [selectedSession.id]);
@@ -67,47 +56,21 @@ export function SessionCanvas({ selectedSession, sessions }: SessionCanvasProps)
     mutationFn: ({ shadowId, message }: { shadowId: string; message: string }) => correctShadow(shadowId, message)
   });
 
-  const messagesBySession = useMemo(
-    () =>
-      sessions.reduce<Record<string, Awaited<ReturnType<typeof fetchSessionMessages>>>>((accumulator, session, index) => {
-        accumulator[session.id] = messageQueries[index]?.data ?? [];
-        return accumulator;
-      }, {}),
-    [messageQueries, sessions]
-  );
-
-  const hasMessageError = messageQueries.some((query) => query.isError);
-  const loadedMessageGroups = messageQueries.reduce(
-    (total, query) => total + (query.data?.length ?? 0),
-    0
-  );
-  const activeAgent = sessions.find((session) => session.id === activeAgentSessionId) ?? null;
+  const shadowAgent = sessions.find((session) => session.id === shadowAgentSessionId) ?? null;
 
   const graph = useMemo(
     () =>
       buildSessionGraph(
         selectedSession.id,
         sessions,
-        messagesBySession,
-        expandedToolCallIds,
+        onSelectAgent,
         (sessionId) => {
-          setActiveAgentSessionId(sessionId);
+          setShadowAgentSessionId(sessionId);
           setShadowInput("");
           setShadowReply(null);
         },
-        (toolCallId) => {
-          setExpandedToolCallIds((current) => {
-            const next = new Set(current);
-            if (next.has(toolCallId)) {
-              next.delete(toolCallId);
-            } else {
-              next.add(toolCallId);
-            }
-            return next;
-          });
-        }
       ),
-    [expandedToolCallIds, messagesBySession, selectedSession.id, sessions]
+    [selectedSession.id, sessions, onSelectAgent]
   );
 
   async function withShadow(sessionId: string, callback: (shadowId: string) => Promise<void>) {
@@ -141,28 +104,23 @@ export function SessionCanvas({ selectedSession, sessions }: SessionCanvasProps)
       <div className="session-canvas-shell__header">
         <div>
           <h2>{selectedSession.taskSummary}</h2>
-          <p>
-            {sessions.length} agent lane(s) and {loadedMessageGroups} persisted message group(s) loaded.
-          </p>
+          <p>{sessions.length} agent session(s)</p>
         </div>
         <span className={`badge badge--${selectedSession.status}`}>{selectedSession.status}</span>
       </div>
 
       <div className="session-canvas">
-        {hasMessageError ? (
-          <div className="session-canvas__overlay">Failed to load one or more session message streams.</div>
-        ) : null}
-        {activeAgent ? (
+        {shadowAgent ? (
           <div className="session-shadow-panel">
             <div className="session-shadow-panel__header">
               <div>
-                <strong>{activeAgent.label}</strong>
+                <strong>{shadowAgent.label}</strong>
                 <span>Shadow steer and correction</span>
               </div>
               <button
                 className="button button--ghost"
                 onClick={() => {
-                  setActiveAgentSessionId(null);
+                  setShadowAgentSessionId(null);
                   setShadowInput("");
                   setShadowReply(null);
                 }}
@@ -183,7 +141,7 @@ export function SessionCanvas({ selectedSession, sessions }: SessionCanvasProps)
                 className="button button--ghost"
                 disabled={!shadowInput.trim() || askShadowMutation.isPending || correctShadowMutation.isPending}
                 onClick={() => {
-                  void withShadow(activeAgent.id, async (shadowId) => {
+                  void withShadow(shadowAgent.id, async (shadowId) => {
                     const result = await askShadowMutation.mutateAsync({
                       shadowId,
                       message: shadowInput.trim()
@@ -199,7 +157,7 @@ export function SessionCanvas({ selectedSession, sessions }: SessionCanvasProps)
                 className="button button--primary"
                 disabled={!shadowInput.trim() || createShadowMutation.isPending || correctShadowMutation.isPending}
                 onClick={() => {
-                  void withShadow(activeAgent.id, async (shadowId) => {
+                  void withShadow(shadowAgent.id, async (shadowId) => {
                     await correctShadowMutation.mutateAsync({
                       shadowId,
                       message: shadowInput.trim()
@@ -246,60 +204,12 @@ export function SessionCanvas({ selectedSession, sessions }: SessionCanvasProps)
 }
 
 function SessionCanvasNode({ data }: NodeProps<SessionCanvasNodeData>) {
-  if (data.kind === "tool_call") {
-    return (
-      <button
-        className="canvas-node canvas-node--tool-call"
-        onClick={() => {
-          if (data.toolCallId) {
-            data.onToggleToolCall?.(data.toolCallId);
-          }
-        }}
-        type="button"
-      >
-        <span className="canvas-node__icon" aria-hidden="true">
-          <img alt="Tool" className="canvas-node__icon-image" src={robotIcon} />
-        </span>
-        <div className="canvas-node__content">
-          <strong>{data.title}</strong>
-          <p>{data.detail}</p>
-          {typeof data.resultCount === "number" ? (
-            <span>{data.isExpanded ? "Hide" : "Show"} {data.resultCount} tool result(s)</span>
-          ) : null}
-        </div>
-      </button>
-    );
-  }
-
-  if (data.kind === "tool_result") {
-    return (
-      <article className="canvas-node canvas-node--tool-result">
-        <div className="canvas-node__content">
-          <strong>{data.title}</strong>
-          <p>{data.detail}</p>
-          {data.meta ? <span>{data.meta}</span> : null}
-        </div>
-      </article>
-    );
-  }
-
-  if (data.kind === "text") {
-    return (
-      <article className="canvas-node canvas-node--text">
-        <div className="canvas-node__content">
-          <strong>{data.title}</strong>
-          <p>{data.detail}</p>
-          {data.meta ? <span>{data.meta}</span> : null}
-        </div>
-      </article>
-    );
-  }
-
   return (
     <button
       className="canvas-node canvas-node--agent"
       data-status={data.status}
       onClick={() => data.onSelectAgent?.(data.sessionId)}
+      onDoubleClick={() => data.onDoubleClickAgent?.(data.sessionId)}
       type="button"
     >
       <Handle

@@ -1296,6 +1296,31 @@ a {
   padding: 0;
 }
 
+.intent-graph-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.intent-detail-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--line);
+  overflow-y: auto;
+  max-height: 50vh;
+}
+
+.intent-detail-panel__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.intent-detail-panel__header strong {
+  font-size: 0.95rem;
+}
+
 .prompt-textarea {
   width: 100%;
   padding: 14px;

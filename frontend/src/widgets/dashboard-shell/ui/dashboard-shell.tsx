@@ -7,7 +7,7 @@ import { SessionTree } from "widgets/dashboard-shell/ui/session-tree";
 import { IntentGraph } from "features/intention-graph/ui/intent-graph";
 
 export function DashboardShell() {
-  const { selectedSessionId, selectSession } = useSelectionStore();
+  const { selectedSessionId, selectSession, intentSessionId, selectIntentSession } = useSelectionStore();
   const {
     childSessions,
     childSessionsError,
@@ -141,7 +141,7 @@ export function DashboardShell() {
                   <p>{childSessionsError instanceof Error ? childSessionsError.message : "Unknown child session error."}</p>
                 </div>
               ) : activeSession ? (
-                <SessionCanvas selectedSession={activeSession} sessions={canvasSessions} />
+                <SessionCanvas selectedSession={activeSession} sessions={canvasSessions} onSelectAgent={selectIntentSession} />
               ) : null}
             </div>
           </section>
@@ -154,8 +154,8 @@ export function DashboardShell() {
               </div>
             </div>
             <div className="panel__body">
-              {selectedSessionId ? (
-                <IntentGraph sessionId={selectedSessionId} />
+              {(intentSessionId ?? selectedSessionId) ? (
+                <IntentGraph sessionId={(intentSessionId ?? selectedSessionId)!} />
               ) : (
                 <div className="empty-state">
                   <strong>Select a session to view its intent graph.</strong>
