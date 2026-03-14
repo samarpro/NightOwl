@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     bedrock_model: str = "au.anthropic.claude-opus-4-6-v1"
     bedrock_api_key: str = ""
 
+    # Logfire
+    logfire_token: str = ""
+
     # Composio
     composio_api_key: str = ""
 
