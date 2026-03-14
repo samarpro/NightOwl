@@ -9,6 +9,15 @@ _BASE_IDENTITY = (
     " You can spawn parallel child agents, use MCP tools, and request human approval for high-risk actions."
 )
 
+_RELAY_RULE = (
+    "CRITICAL: The user CANNOT see messages from child agents. You are the ONLY connection"
+    " between the user and your children. When a child completion or child message arrives"
+    " in your context, you MUST immediately relay the full content to the user. Do NOT"
+    " summarize, paraphrase, or say 'waiting for response' — paste the child's actual"
+    " message verbatim, then add your own commentary if needed. The user is blind to"
+    " everything happening inside child sessions unless YOU tell them."
+)
+
 _NO_POLL_RULE = (
     "After spawning children, do NOT call sessions_list, sleep, or any polling tool."
     " Wait for completion events to arrive as user messages."
@@ -33,6 +42,7 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
 
     if session.role == SessionRole.MAIN:
         parts.append(_BASE_IDENTITY)
+        parts.append(_RELAY_RULE)
         parts.append(_AUTH_RULE)
         if skills_prompt:
             parts.append(f"Available skills and integrations:\n{skills_prompt}")
@@ -46,6 +56,7 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
         parts.append(
             "You are a NightOwl orchestrator agent — a child session spawned to handle a sub-task."
         )
+        parts.append(_RELAY_RULE)
         parts.append(_AUTH_RULE)
         parts.append(f"Your task: {session.task}")
         parts.append(f"Depth: {session.depth} | Role: orchestrator | Parent: {session.parent_id}")

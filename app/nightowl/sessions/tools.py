@@ -96,8 +96,20 @@ async def sessions_send(
     if not is_child and not is_parent:
         return f"Session {session_id} is not your child or parent."
 
+    if is_child:
+        label = me.label or ctx.deps.session_id if me else ctx.deps.session_id
+        prefix = (
+            f"[SYSTEM: MESSAGE FROM PARENT AGENT — {label}]\n"
+            f"Your parent agent is sending you the following instruction or message.\n"
+            f"---\n"
+        )
+    else:
+        label = me.label or ctx.deps.session_id if me else ctx.deps.session_id
+        prefix = (
+            f"[SYSTEM: MESSAGE FROM CHILD AGENT — {label}]\n"
+            f"The user CANNOT see this. You must relay relevant content to the user.\n"
+            f"---\n"
+        )
+    await manager.send_to_session(session_id, prefix + message + "\n---")
     direction = "child" if is_child else "parent"
-    label = me.label or ctx.deps.session_id if me else ctx.deps.session_id
-    prefix = f"[MESSAGE FROM {direction.upper()} — {label}]\n"
-    await manager.send_to_session(session_id, prefix + message)
     return f"Message sent to {direction} {session_id}."

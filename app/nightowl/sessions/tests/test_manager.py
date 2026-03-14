@@ -125,14 +125,15 @@ class TestCompletionDelivery:
         msg = await asyncio.wait_for(q.get(), timeout=1)
         assert "here is the data" in msg
 
-    async def test_completion_message_marked_as_untrusted(self, manager: SessionManager):
+    async def test_completion_message_tagged_as_child_output(self, manager: SessionManager):
         parent = await manager.create_main_session("parent")
         child = await manager.spawn_child(parent.id, SpawnRequest(task="fetch"))
         await manager.complete_session(child.id, "result")
 
         q = manager.get_queue(parent.id)
         msg = await asyncio.wait_for(q.get(), timeout=1)
-        assert "untrusted" in msg.lower()
+        assert "child" in msg.lower()
+        assert "cannot see this" in msg.lower()
 
     async def test_completion_includes_child_label(self, manager: SessionManager):
         parent = await manager.create_main_session("parent")

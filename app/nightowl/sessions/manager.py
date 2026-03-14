@@ -161,11 +161,12 @@ class SessionManager:
         child = self._sessions.get(event.child_session_id)
         label = child.label or event.child_session_id if child else event.child_session_id
 
-        # Mark result as untrusted (came from child agent)
         message = (
-            f"[CHILD COMPLETION — {label}]\n"
+            f"[SYSTEM: CHILD SESSION COMPLETED — {label}]\n"
             f"Status: {'success' if event.success else 'failed'}\n"
-            f"Result (untrusted child output):\n{event.result}"
+            f"The following is output from child agent {label}. "
+            f"The user CANNOT see this — you MUST relay relevant content to the user.\n"
+            f"---\n{event.result}\n---"
         )
         await self.send_to_session(event.parent_session_id, message)
 
