@@ -32,7 +32,10 @@ Respond with:
 - service: the external service or system involved (e.g. "gmail", "calendar", "web-search", "internal")
 - intent: what the agent is trying to accomplish (e.g. "fetch-emails", "check-availability", "search-restaurants")
 - status: "in_progress", "completed", "failed", or "waiting"
-- summary: one-sentence description of what happened"""
+- summary: a detailed 2-4 sentence description of what happened in this step. \
+Include what the agent decided to do, which tools it called and why, \
+what data it received or produced, and the outcome. \
+This summary is the primary way users understand what the agent did — be specific and informative."""
 
 
 class ClassifiedIntent(BaseModel):
@@ -70,18 +73,18 @@ def _format_chunk(chunk: list[TokenEntry]) -> str:
     lines = []
     for e in chunk:
         if e.token_type == TokenType.THINKING:
-            lines.append(f"[THINKING] {e.content[:200]}")
+            lines.append(f"[THINKING] {e.content[:500]}")
         elif e.token_type == TokenType.TOOL_CALL:
-            args = e.metadata.get("args", "")[:200]
+            args = e.metadata.get("args", "")[:400]
             lines.append(f"[TOOL CALL] {e.content}({args})")
         elif e.token_type == TokenType.TOOL_RESULT:
-            lines.append(f"[TOOL RESULT] {e.content[:200]}")
+            lines.append(f"[TOOL RESULT] {e.content[:500]}")
         elif e.token_type == TokenType.RESPONSE:
-            lines.append(f"[RESPONSE] {e.content[:300]}")
+            lines.append(f"[RESPONSE] {e.content[:600]}")
         elif e.token_type == TokenType.SPAWN:
             lines.append(f"[SPAWN] {e.content}")
         elif e.token_type == TokenType.COMPLETION:
-            lines.append(f"[COMPLETION] {e.content[:200]}")
+            lines.append(f"[COMPLETION] {e.content[:400]}")
     return "\n".join(lines)
 
 
@@ -117,13 +120,26 @@ async def classify_chunk(chunk: list[TokenEntry]) -> ClassifiedIntent:
 
 
 def intent_to_node(
-    session_id: str, chunk_index: int, classified: ClassifiedIntent,
+    session_id: str,
+    chunk_index: int,
+    classified: ClassifiedIntent,
+    token_start: int,
+    token_end: int,
+    started_at: float,
+    ended_at: float,
 ) -> IntentNode:
     """Convert a classified intent into an IntentNode."""
     return IntentNode(
         id=f"{session_id}:intent:{chunk_index}",
         label=f"{classified.service}/{classified.intent}",
         type=classified.status,
+        service=classified.service,
+        intent=classified.intent,
+        summary=classified.summary,
+        token_start=token_start,
+        token_end=token_end,
+        started_at=started_at,
+        ended_at=ended_at,
     )
 
 

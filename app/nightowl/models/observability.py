@@ -19,6 +19,13 @@ class IntentNode(BaseModel):
     id: str
     label: str
     type: str = "session"
+    service: str = ""
+    intent: str = ""
+    summary: str = ""
+    token_start: int = 0
+    token_end: int = 0
+    started_at: float = 0.0
+    ended_at: float = 0.0
 
 
 class IntentEdge(BaseModel):

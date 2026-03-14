@@ -37,6 +37,25 @@ async def get_tokens(session_id: str, request: Request, last: int = 20) -> list[
     ]
 
 
+@router.get("/tokens/{session_id}/range")
+async def get_tokens_range(
+    session_id: str, request: Request, start: int = 0, end: int | None = None,
+) -> list[dict[str, Any]]:
+    """Fetch tokens for a specific range — used to get chat history for an intent node."""
+    token_store = request.app.state.token_store
+    # end is inclusive from the node, but slice is exclusive
+    entries = token_store.get_range(session_id, start, (end + 1) if end is not None else None)
+    return [
+        {
+            "type": e.token_type.value,
+            "content": e.content,
+            "metadata": e.metadata,
+            "timestamp": e.timestamp,
+        }
+        for e in entries
+    ]
+
+
 @router.post("/intent-graph/{session_id}/process")
 async def process_intent_graph(session_id: str, request: Request) -> dict[str, Any]:
     """Manually trigger intent processing for a session."""

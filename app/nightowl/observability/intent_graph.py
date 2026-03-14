@@ -59,9 +59,20 @@ class IntentGraphManager:
         graph = self._graphs.get(session_id, IntentGraph())
         existing_node_count = len(graph.nodes)
 
+        # Build absolute token offsets for each chunk
+        offset = processed
         for i, chunk in enumerate(chunks):
+            token_start = offset
+            token_end = offset + len(chunk) - 1
+            offset += len(chunk)
+            started_at = chunk[0].timestamp if chunk else 0.0
+            ended_at = chunk[-1].timestamp if chunk else 0.0
             classified = await classify_chunk(chunk)
-            node = intent_to_node(session_id, existing_node_count + i, classified)
+            node = intent_to_node(
+                session_id, existing_node_count + i, classified,
+                token_start=token_start, token_end=token_end,
+                started_at=started_at, ended_at=ended_at,
+            )
             graph.nodes.append(node)
 
         # Rebuild edges for the full graph

@@ -13,24 +13,60 @@ type IntentGraphProps = {
   sessionId: string;
 };
 
+type ApiIntentNode = {
+  id: string;
+  label: string;
+  type: string;
+  service: string;
+  intent: string;
+  summary: string;
+  token_start: number;
+  token_end: number;
+  started_at: number;
+  ended_at: number;
+};
+
+function statusColor(type: string) {
+  if (type === "completed") return "#22c55e";
+  if (type === "failed") return "#ef4444";
+  if (type === "waiting") return "#eab308";
+  return "#3b82f6";
+}
+
 function transformToReactFlow(
-  graph: { nodes: Array<{ id: string; label: string; type: string }>; edges: Array<{ source: string; target: string; label: string }> }
+  graph: { nodes: ApiIntentNode[]; edges: Array<{ source: string; target: string; label: string }> }
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = graph.nodes.map((n, index) => ({
     id: n.id,
-    data: { label: n.label },
-    position: { x: 100 + (index % 2) * 200, y: index * 180 },
+    data: {
+      label: (
+        <div style={{ textAlign: "left" }}>
+          <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "4px", opacity: 0.7 }}>
+            {n.service}/{n.intent}
+          </div>
+          <div style={{ fontSize: "13px", lineHeight: 1.4 }}>
+            {n.summary}
+          </div>
+          {n.ended_at > 0 && n.started_at > 0 && (
+            <div style={{ fontSize: "11px", marginTop: "6px", opacity: 0.6 }}>
+              {Math.round(n.ended_at - n.started_at)}s
+            </div>
+          )}
+        </div>
+      ),
+    },
+    position: { x: 100 + (index % 2) * 220, y: index * 220 },
     sourcePosition: Position.Bottom,
     targetPosition: Position.Top,
     style: {
-      background: n.type === "completed" ? "#22c55e" : n.type === "waiting" ? "#eab308" : "#3b82f6",
+      background: statusColor(n.type),
       color: "#fff",
-      padding: "16px 24px",
+      padding: "16px 20px",
       borderRadius: "12px",
       border: "2px solid rgba(255,255,255,0.15)",
       fontSize: "14px",
-      minWidth: "180px",
-      textAlign: "center",
+      minWidth: "240px",
+      maxWidth: "360px",
       boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
     },
   }));
