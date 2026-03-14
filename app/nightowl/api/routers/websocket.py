@@ -7,14 +7,17 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
+from nightowl.models.approval import ApprovalDecision
+
 router = APIRouter(tags=["websocket"])
 
 
 class ApprovalRespondMessage(BaseModel):
     type: str = Field(pattern=r"^approval\.respond$")
     approval_id: str
-    approved: bool
+    decision: ApprovalDecision
     reason: str | None = None
+    redirect_message: str | None = None
 
 
 @router.websocket("/ws")
@@ -36,8 +39,9 @@ async def websocket_events(websocket: WebSocket) -> None:
             message = ApprovalRespondMessage.model_validate(payload)
             gate.resolve_approval(
                 message.approval_id,
-                approved=message.approved,
+                decision=message.decision,
                 reason=message.reason,
+                redirect_message=message.redirect_message,
             )
     except WebSocketDisconnect:
         pass

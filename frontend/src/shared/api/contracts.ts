@@ -1,6 +1,15 @@
 import { z } from "zod";
 
 export const sessionStatusSchema = z.enum(["running", "waiting", "blocked", "completed"]);
+export const apiSessionStateSchema = z.enum([
+  "pending",
+  "running",
+  "waiting",
+  "blocked",
+  "completed",
+  "failed",
+  "cancelled"
+]);
 export const riskLevelSchema = z.enum(["low", "medium", "high"]);
 export const tokenTypeSchema = z.enum(["thinking", "tool_call", "tool_result", "response"]);
 export const channelMessageSchema = z.object({
@@ -25,6 +34,21 @@ export const sessionNodeSchema = z.object({
   channel: z.string(),
   startedAt: z.string(),
   waitReason: z.string().nullable()
+});
+
+export const apiSessionSchema = z.object({
+  id: z.string(),
+  parentId: z.string().nullable(),
+  role: z.string(),
+  state: apiSessionStateSchema,
+  depth: z.number().int().nonnegative(),
+  task: z.string(),
+  label: z.string().nullable(),
+  sandboxMode: z.string().nullable(),
+  channelRoute: z.string().nullable(),
+  createdAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  result: z.string().nullable()
 });
 
 export const intentNodeSchema = z.object({
@@ -110,6 +134,7 @@ export type DashboardSnapshot = z.infer<typeof dashboardSnapshotSchema>;
 export type ChannelMessageDto = z.infer<typeof channelMessageSchema>;
 export type IngestMessageResponseDto = z.infer<typeof ingestMessageResponseSchema>;
 export type SessionNodeDto = z.infer<typeof sessionNodeSchema>;
+export type ApiSessionDto = z.infer<typeof apiSessionSchema>;
 export type IntentNodeDto = z.infer<typeof intentNodeSchema>;
 export type ApprovalDto = z.infer<typeof approvalSchema>;
 export type TokenEntryDto = z.infer<typeof tokenEntrySchema>;

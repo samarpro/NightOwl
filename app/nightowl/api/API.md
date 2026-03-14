@@ -14,11 +14,17 @@ FastAPI routers that expose NightOwl's HTTP and WebSocket interface. All routes 
 
 ### Approvals (`routers/approvals.py`)
 
-`POST /api/v1/approvals/respond` — accepts an `ApprovalResponse` body and resolves a pending HITL approval via the gate. Used by the dashboard UI.
+`POST /api/v1/approvals/respond` — accepts an `ApprovalResponse` body with `decision` (`approve`, `reject`, or `redirect`) and resolves a pending HITL approval via the gate. Used by the dashboard UI.
+
+### Sessions (`routers/sessions.py`)
+
+`GET /api/v1/sessions/` — returns top-level sessions where `parent_id` is null.
+
+`GET /api/v1/sessions/?parentId=<session-id>` — returns direct child sessions for the given parent session ID.
 
 ### Webhooks (`routers/webhooks.py`)
 
-`POST /api/v1/channels/telegram/webhook` — Telegram Bot API webhook endpoint. Validates the secret token header, handles two payload types: regular messages (normalized and forwarded to `IngressService`) and callback queries (inline keyboard button presses for HITL approve/reject, resolved directly via the gate). Answers callback queries to clear Telegram's loading spinner.
+`POST /api/v1/channels/telegram/webhook` — Telegram Bot API webhook endpoint. Validates the secret token header, handles two payload types: regular messages (normalized and forwarded to `IngressService`) and callback queries (inline keyboard button presses for HITL approve/reject/redirect, resolved directly via the gate). Redirect prompts the user for a follow-up message; the next inbound message becomes the redirected instruction. Answers callback queries to clear Telegram's loading spinner.
 
 `POST /api/v1/channels/whatsapp/webhook` — Twilio WhatsApp webhook (form-encoded). Normalizes inbound messages and forwards to `IngressService`. Also handles text-based HITL approval replies ("APPROVE {id}" / "REJECT {id}").
 

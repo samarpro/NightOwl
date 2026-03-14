@@ -1,6 +1,6 @@
 # HITL (Human-in-the-Loop)
 
-The HITL system gates high-risk tool calls behind human approval. Before a dangerous action executes, the user must explicitly approve it — either from the web dashboard or inline in their messaging app.
+The HITL system gates high-risk tool calls behind human approval. Before a dangerous action executes, the user can approve it, reject it, or redirect it. A redirect does not immediately send replacement instructions into the run; instead, NightOwl prompts the user for a follow-up message and treats that next inbound message as the new direction for the same session.
 
 ## Risk Classification
 
@@ -34,6 +34,7 @@ Calls Claude Haiku via Bedrock to verify the agent's self-reported risk. Uses a 
 3. Resolves the session's channel — walks up the parent chain if the approval originates from a child session, so child HITL requests reach the user's messaging app
 4. Sends an inline approval request through the appropriate bridge (Telegram inline keyboard, WhatsApp/SMS text prompt)
 5. Blocks indefinitely on an `asyncio.Event` until the human responds — no timeout
-6. First response wins — dashboard, WebSocket, Telegram callback query, and WhatsApp text reply all race; whichever responds first takes effect
+6. If redirected, sends a channel prompt asking the user to reply with a new direction, then waits for the next inbound user message to resume the session with that redirected instruction
+7. First response wins — dashboard, WebSocket, Telegram callback query, and channel all race; whichever responds first takes effect
 
 The gate is shared across all sessions via the `SessionManager` and receives the `ChannelRegistry` at construction time.

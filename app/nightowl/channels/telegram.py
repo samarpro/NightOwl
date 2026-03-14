@@ -41,11 +41,24 @@ class TelegramBridge(ChannelBridge):
             thread_id=str(thread_id) if thread_id is not None else None,
         )
 
-    async def send_message(self, user_id: str, text: str) -> None:
+    async def send_message(
+        self,
+        user_id: str,
+        text: str,
+        *,
+        reply_to_message_id: str | None = None,
+    ) -> None:
         html = markdown_to_telegram_html(text)
-        await self._bot.send_message(chat_id=user_id, text=html, parse_mode="HTML")
+        kwargs: dict[str, Any] = {
+            "chat_id": user_id,
+            "text": html,
+            "parse_mode": "HTML",
+        }
+        if reply_to_message_id is not None:
+            kwargs["reply_to_message_id"] = int(reply_to_message_id)
+        await self._bot.send_message(**kwargs)
 
-    async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> None:
+    async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> dict[str, str] | None:
         args_str = json.dumps(approval.tool_args, indent=2)
         text = (
             f"🔒 <b>Approval Required</b> [{approval.risk_level.value.upper()}]\n\n"
@@ -56,11 +69,13 @@ class TelegramBridge(ChannelBridge):
             [
                 InlineKeyboardButton("✅ Approve", callback_data=f"approve:{approval.id}"),
                 InlineKeyboardButton("❌ Reject", callback_data=f"reject:{approval.id}"),
+                InlineKeyboardButton("↩ Redirect", callback_data=f"redirect:{approval.id}"),
             ]
         ])
-        await self._bot.send_message(
+        sent = await self._bot.send_message(
             chat_id=user_id,
             text=text,
             parse_mode="HTML",
             reply_markup=keyboard,
         )
+        return {"message_id": str(sent.message_id)}

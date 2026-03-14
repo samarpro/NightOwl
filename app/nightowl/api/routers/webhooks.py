@@ -9,6 +9,7 @@ from fastapi import APIRouter, Form, HTTPException, Header, Request
 
 from nightowl.composio_tools.meta_tools import auth_waiter
 from nightowl.config import settings
+from nightowl.models.approval import ApprovalDecision
 
 log = logging.getLogger(__name__)
 
@@ -55,20 +56,36 @@ async def telegram_webhook(
 
 
 async def _handle_telegram_callback(request: Request, callback_query: dict) -> dict[str, object]:
-    """Handle inline keyboard button presses (HITL approve/reject)."""
+    """Handle inline keyboard button presses (HITL approve/reject/redirect)."""
     data = callback_query.get("data", "")
     log.debug("Telegram callback_query data: %s", data)
 
-    # callback_data format: "approve:approval_id" or "reject:approval_id"
+    # callback_data format: "approve:approval_id", "reject:approval_id", or "redirect:approval_id"
     gate = request.app.state.hitl_gate
     if data.startswith("approve:"):
         approval_id = data[len("approve:"):]
-        gate.resolve_approval(approval_id, approved=True, reason="Approved via Telegram")
+        gate.resolve_approval(
+            approval_id,
+            decision=ApprovalDecision.APPROVE,
+            reason="Approved via Telegram",
+        )
         log.info("Approval %s approved via Telegram", approval_id)
     elif data.startswith("reject:"):
         approval_id = data[len("reject:"):]
-        gate.resolve_approval(approval_id, approved=False, reason="Rejected via Telegram")
+        gate.resolve_approval(
+            approval_id,
+            decision=ApprovalDecision.REJECT,
+            reason="Rejected via Telegram",
+        )
         log.info("Approval %s rejected via Telegram", approval_id)
+    elif data.startswith("redirect:"):
+        approval_id = data[len("redirect:"):]
+        gate.resolve_approval(
+            approval_id,
+            decision=ApprovalDecision.REDIRECT,
+            reason="Redirected via Telegram",
+        )
+        log.info("Approval %s redirected via Telegram", approval_id)
     else:
         log.warning("Unknown Telegram callback_query data: %s", data)
         return {"ok": True, "skipped": True}
@@ -80,7 +97,13 @@ async def _handle_telegram_callback(request: Request, callback_query: dict) -> d
         try:
             await bridge._bot.answer_callback_query(
                 callback_query["id"],
-                text="Approved!" if data.startswith("approve:") else "Rejected.",
+                text=(
+                    "Approved!"
+                    if data.startswith("approve:")
+                    else "Reply with the new direction."
+                    if data.startswith("redirect:")
+                    else "Rejected."
+                ),
             )
         except Exception:
             log.debug("Failed to answer callback query", exc_info=True)

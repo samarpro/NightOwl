@@ -1,33 +1,36 @@
-import { useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchDashboardSnapshot, subscribeMockEvents } from "shared/api/mock-gateway";
-import { toDashboardState, applyGatewayEvent } from "entities/dashboard/model/adapters";
-import type { DashboardState } from "entities/dashboard/model/types";
-import { translateGatewayEvent } from "shared/websocket/translate-event";
+import { useQuery } from "@tanstack/react-query";
+import { fetchChildSessions, fetchRootSessions } from "shared/api/sessions";
 
-const dashboardQueryKey = ["dashboard"];
+const rootSessionsQueryKey = ["sessions", "roots"] as const;
 
-export function useDashboardData() {
-  const queryClient = useQueryClient();
-  const query = useQuery({
-    queryKey: dashboardQueryKey,
-    queryFn: async () => toDashboardState(await fetchDashboardSnapshot())
+export function useDashboardData(selectedSessionId: string | null) {
+  const rootSessionsQuery = useQuery({
+    queryKey: rootSessionsQueryKey,
+    queryFn: fetchRootSessions
   });
 
-  useEffect(() => {
-    const unsubscribe = subscribeMockEvents((rawEvent) => {
-      const event = translateGatewayEvent(rawEvent);
-      queryClient.setQueryData<DashboardState>(dashboardQueryKey, (current) => {
-        if (!current) {
-          return current;
-        }
+  const childSessionsQuery = useQuery({
+    queryKey: [...rootSessionsQueryKey, selectedSessionId, "children"],
+    queryFn: () => fetchChildSessions(selectedSessionId as string),
+    enabled: selectedSessionId !== null
+  });
 
-        return applyGatewayEvent(current, event);
-      });
-    });
+  const rootSessions = rootSessionsQuery.data ?? [];
+  const childSessions = childSessionsQuery.data ?? [];
+  const activeStatuses = new Set(["running", "waiting", "blocked"]);
+  const activeRootCount = rootSessions.filter((session) => activeStatuses.has(session.status)).length;
+  const routedChannels = new Set(rootSessions.map((session) => session.channel).filter(Boolean));
+  const pendingRoots = rootSessions.filter((session) => session.waitReason !== null).length;
 
-    return unsubscribe;
-  }, [queryClient]);
-
-  return query;
+  return {
+    rootSessions,
+    childSessions,
+    tasksActive: activeRootCount,
+    pendingApprovals: pendingRoots,
+    liveChannels: routedChannels.size,
+    isLoading: rootSessionsQuery.isLoading || childSessionsQuery.isLoading,
+    isFetching: rootSessionsQuery.isFetching || childSessionsQuery.isFetching,
+    rootSessionsError: rootSessionsQuery.error,
+    childSessionsError: childSessionsQuery.error
+  };
 }

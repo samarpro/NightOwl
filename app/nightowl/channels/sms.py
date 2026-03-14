@@ -45,7 +45,13 @@ class SMSBridge(ChannelBridge):
             thread_id=None,
         )
 
-    async def send_message(self, user_id: str, text: str) -> None:
+    async def send_message(
+        self,
+        user_id: str,
+        text: str,
+        *,
+        reply_to_message_id: str | None = None,
+    ) -> None:
         formatted = markdown_to_plaintext(text)
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
@@ -55,14 +61,14 @@ class SMSBridge(ChannelBridge):
             ),
         )
 
-    async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> None:
+    async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> dict[str, str] | None:
         text = (
             f"Approval Required [{approval.risk_level.value.upper()}]\n\n"
             f"Tool: {approval.tool_name}\n"
             f"Args: {json.dumps(approval.tool_args)}\n"
             f"Session: {approval.session_id}\n"
             f"ID: {approval.id}\n\n"
-            f"Reply APPROVE {approval.id} or REJECT {approval.id}"
+            f"Reply APPROVE {approval.id}, REJECT {approval.id}, or REDIRECT {approval.id}"
         )
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
@@ -71,3 +77,4 @@ class SMSBridge(ChannelBridge):
                 to=user_id, from_=self._from_number, body=text,
             ),
         )
+        return None

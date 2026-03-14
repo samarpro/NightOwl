@@ -8,6 +8,7 @@ from typing import Any
 
 from nightowl.events import EventBus
 from nightowl.hitl.gate import HITLGate
+from nightowl.models.approval import ApprovalDecision
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.runner import run_child_session, run_interactive
 
@@ -47,15 +48,35 @@ async def _approval_listener(bus: EventBus, gate: HITLGate) -> None:
 
         try:
             answer = await loop.run_in_executor(
-                None, lambda: input("  approve? (y/n): ").strip().lower()
+                None, lambda: input("  decision? (a=approve, r=reject, d=redirect): ").strip()
             )
-            approved = answer in ("y", "yes")
+            normalized = answer.lower()
+            if normalized in ("a", "approve", "y", "yes"):
+                decision = ApprovalDecision.APPROVE
+                reason = "CLI user approved"
+                redirect_message = None
+            elif normalized in ("d", "redirect"):
+                redirect_message = await loop.run_in_executor(
+                    None, lambda: input("  redirect instruction: ").strip()
+                )
+                decision = ApprovalDecision.REDIRECT
+                reason = "CLI user redirected"
+            else:
+                decision = ApprovalDecision.REJECT
+                reason = "CLI user denied"
+                redirect_message = None
         except (EOFError, KeyboardInterrupt):
-            approved = False
+            decision = ApprovalDecision.REJECT
+            reason = "CLI user denied"
+            redirect_message = None
 
-        reason = "CLI user approved" if approved else "CLI user denied"
-        gate.resolve_approval(approval_id, approved=approved, reason=reason)
-        status = "APPROVED" if approved else "DENIED"
+        gate.resolve_approval(
+            approval_id,
+            decision=decision,
+            reason=reason,
+            redirect_message=redirect_message,
+        )
+        status = decision.value.upper()
         print(f"  [{status}]\n")
 
 

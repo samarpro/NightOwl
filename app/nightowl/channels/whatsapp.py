@@ -47,7 +47,13 @@ class WhatsAppBridge(ChannelBridge):
             thread_id=None,
         )
 
-    async def send_message(self, user_id: str, text: str) -> None:
+    async def send_message(
+        self,
+        user_id: str,
+        text: str,
+        *,
+        reply_to_message_id: str | None = None,
+    ) -> None:
         formatted = markdown_to_whatsapp(text)
         to = f"whatsapp:{user_id}" if not user_id.startswith("whatsapp:") else user_id
         from_ = f"whatsapp:{self._from_number}" if not self._from_number.startswith("whatsapp:") else self._from_number
@@ -57,14 +63,14 @@ class WhatsAppBridge(ChannelBridge):
             lambda: self._client.messages.create(to=to, from_=from_, body=formatted),
         )
 
-    async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> None:
+    async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> dict[str, str] | None:
         text = (
             f"Approval Required [{approval.risk_level.value.upper()}]\n\n"
             f"Tool: {approval.tool_name}\n"
             f"Args: {json.dumps(approval.tool_args)}\n"
             f"Session: {approval.session_id}\n"
             f"ID: {approval.id}\n\n"
-            f"Reply APPROVE or REJECT"
+            f"Reply APPROVE {approval.id}, REJECT {approval.id}, or REDIRECT {approval.id}"
         )
         to = f"whatsapp:{user_id}" if not user_id.startswith("whatsapp:") else user_id
         from_ = f"whatsapp:{self._from_number}" if not self._from_number.startswith("whatsapp:") else self._from_number
@@ -73,3 +79,4 @@ class WhatsAppBridge(ChannelBridge):
             None,
             lambda: self._client.messages.create(to=to, from_=from_, body=text),
         )
+        return None

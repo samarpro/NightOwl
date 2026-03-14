@@ -15,6 +15,12 @@ class RiskLevel(StrEnum):
     CRITICAL = "critical"
 
 
+class ApprovalDecision(StrEnum):
+    APPROVE = "approve"
+    REJECT = "reject"
+    REDIRECT = "redirect"
+
+
 class ToolCallWithRisk(BaseModel):
     tool_name: str
     tool_args: dict[str, Any] = {}
@@ -32,5 +38,12 @@ class ApprovalRequest(BaseModel):
 
 class ApprovalResponse(BaseModel):
     approval_id: str
-    approved: bool
+    decision: ApprovalDecision
     reason: str | None = None
+    redirect_message: str | None = None
+
+
+class ApprovalResult(BaseModel):
+    decision: ApprovalDecision
+    reason: str | None = None
+    redirect_message: str | None = None

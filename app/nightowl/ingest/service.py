@@ -76,8 +76,16 @@ class IngressService:
             "text": message.text,
         })
 
+        inbound_text = message.text
+        if self._manager.hitl_gate is not None:
+            if self._manager.hitl_gate.handle_text_response(message.text):
+                return IngestResult(session_id=session.id, created=created)
+            redirected = self._manager.hitl_gate.consume_redirect_instruction(session.id, message.text)
+            if redirected is not None:
+                inbound_text = redirected
+
         await self._ensure_worker(session)
-        await self._manager.send_to_session(session.id, message.text)
+        await self._manager.send_to_session(session.id, inbound_text)
         return IngestResult(session_id=session.id, created=created)
 
     async def shutdown(self) -> None:

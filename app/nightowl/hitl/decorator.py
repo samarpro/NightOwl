@@ -26,7 +26,7 @@ from typing import Any
 from pydantic_ai import RunContext
 
 from nightowl.hitl.classifier import verify_risk as _default_verify_risk
-from nightowl.models.approval import RiskLevel
+from nightowl.models.approval import ApprovalDecision, RiskLevel
 from nightowl.sessions.tools import AgentState
 
 log = logging.getLogger(__name__)
@@ -77,14 +77,19 @@ def hitl_gated(fn: Any) -> Any:
                 log.warning("No HITL gate configured — denying %s by default", fn.__name__)
                 return f"Action denied — no approval gate configured for {fn.__name__}."
 
-            approved = await gate.request_approval(
+            approval_result = await gate.request_approval(
                 session_id=ctx.deps.session_id,
                 tool_name=fn.__name__,
                 tool_args={k: v for k, v in kwargs.items()},
                 risk_level=verified_risk,
             )
-            if not approved:
-                return f"Action denied — {fn.__name__} was rejected by the user."
+            if approval_result.decision == ApprovalDecision.REJECT:
+                reason_suffix = (
+                    f" Reason: {approval_result.reason}" if approval_result.reason else ""
+                )
+                return f"Action denied — {fn.__name__} was rejected by the user.{reason_suffix}"
+            if approval_result.decision == ApprovalDecision.REDIRECT:
+                return ""
 
         # Approved or LOW — call the actual tool
         try:

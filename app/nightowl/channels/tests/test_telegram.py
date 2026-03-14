@@ -189,7 +189,7 @@ class TestTelegramSendApproval:
         assert "STRIPE_CHARGE" in call_str
         assert "critical" in call_str.lower() or "CRITICAL" in call_str
 
-    async def test_approval_keyboard_has_approve_and_reject(self):
+    async def test_approval_keyboard_has_approve_reject_and_redirect(self):
         with patch("nightowl.channels.telegram._get_bot_token", return_value="fake:token"):
             bridge = TelegramBridge()
 
@@ -205,9 +205,10 @@ class TestTelegramSendApproval:
         await bridge.send_approval_request("12345", approval)
 
         call_str = str(bridge._bot.send_message.call_args).lower()
-        # Inline keyboard must have both approve and reject options
+        # Inline keyboard must have approve, reject, and redirect options
         assert "approve" in call_str or "allow" in call_str or "yes" in call_str
         assert "reject" in call_str or "deny" in call_str or "no" in call_str
+        assert "redirect" in call_str
 
     async def test_approval_callback_data_contains_approval_id(self):
         """The inline keyboard callback_data must embed the approval_id so we can resolve it."""

@@ -34,17 +34,24 @@ class StubBridge(ChannelBridge):
 
     def __init__(self) -> None:
         self.started = False
-        self.sent_messages: list[tuple[str, str]] = []
+        self.sent_messages: list[tuple[str, str, str | None]] = []
         self.sent_approvals: list[tuple[str, ApprovalRequest]] = []
 
     async def start(self) -> None:
         self.started = True
 
-    async def send_message(self, user_id: str, text: str) -> None:
-        self.sent_messages.append((user_id, text))
+    async def send_message(
+        self,
+        user_id: str,
+        text: str,
+        *,
+        reply_to_message_id: str | None = None,
+    ) -> None:
+        self.sent_messages.append((user_id, text, reply_to_message_id))
 
-    async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> None:
+    async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> dict[str, str] | None:
         self.sent_approvals.append((user_id, approval))
+        return None
 
     def normalize_inbound(self, raw: dict[str, Any]) -> ChannelMessage:
         return ChannelMessage(
@@ -84,7 +91,7 @@ class TestChannelBridgeABC:
             class BadBridge(ChannelBridge):
                 channel_id = "bad"
                 async def start(self) -> None: ...
-                async def send_message(self, user_id, text): ...
+                async def send_message(self, user_id, text, *, reply_to_message_id=None): ...
                 async def send_approval_request(self, user_id, approval): ...
             BadBridge()
 
@@ -98,7 +105,7 @@ class TestBridgeSendMessage:
     async def test_send_message_records_user_and_text(self):
         bridge = StubBridge()
         await bridge.send_message("user123", "Hello from NightOwl")
-        assert bridge.sent_messages == [("user123", "Hello from NightOwl")]
+        assert bridge.sent_messages == [("user123", "Hello from NightOwl", None)]
 
     async def test_send_multiple_messages(self):
         bridge = StubBridge()
@@ -250,7 +257,7 @@ class TestRegistrySendViaLastChannel:
         channel_bridge = registry.get(last["channel"])
         await channel_bridge.send_message(last["chat_id"], "Your reservation is confirmed")
 
-        assert bridge.sent_messages == [("user123", "Your reservation is confirmed")]
+        assert bridge.sent_messages == [("user123", "Your reservation is confirmed", None)]
 
     async def test_send_approval_via_last_channel(self):
         registry = ChannelRegistry()

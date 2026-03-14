@@ -187,6 +187,7 @@ class TestSMSSendApproval:
         # Must include reply instructions since SMS has no buttons
         assert "approve" in call_str
         assert "reject" in call_str
+        assert "redirect" in call_str
 
     async def test_approval_text_contains_approval_id(self):
         """The approval ID must be in the message so reply parsing can match it."""

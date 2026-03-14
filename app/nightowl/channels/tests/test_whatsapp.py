@@ -154,7 +154,7 @@ class TestWhatsAppSendApproval:
         call_str = str(mock_client.messages.create.call_args)
         assert "STRIPE_CHARGE" in call_str
 
-    async def test_approval_message_has_approve_and_reject_options(self):
+    async def test_approval_message_has_approve_reject_and_redirect_options(self):
         with patch("nightowl.channels.whatsapp._get_twilio_client") as mock_client_fn:
             mock_client = MagicMock()
             mock_client_fn.return_value = mock_client
@@ -172,3 +172,4 @@ class TestWhatsAppSendApproval:
         call_str = str(mock_client.messages.create.call_args).lower()
         assert "approve" in call_str or "allow" in call_str or "yes" in call_str
         assert "reject" in call_str or "deny" in call_str or "no" in call_str
+        assert "redirect" in call_str

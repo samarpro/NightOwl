@@ -13,6 +13,7 @@ from nightowl.api.routers.approvals import router as approvals_router
 from nightowl.api.routers.health import router as health_router
 from nightowl.api.routers.ingest import router as ingest_router
 from nightowl.api.routers.observability import router as observability_router
+from nightowl.api.routers.sessions import router as sessions_router
 from nightowl.api.routers.shadow import router as shadow_router
 from nightowl.api.routers.skills import router as skills_router
 from nightowl.api.routers.webhooks import router as webhooks_router
@@ -110,6 +111,8 @@ def create_app() -> FastAPI:
     application.include_router(approvals_router)
     application.include_router(observability_router)
     application.include_router(shadow_router)
+    application.include_router(sessions_router)
+    application.include_router(sessions_router)
     application.include_router(skills_router)
     application.include_router(webhooks_router)
     application.include_router(websocket_router)

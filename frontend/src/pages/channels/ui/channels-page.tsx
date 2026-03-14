@@ -1,17 +1,54 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { buildChannels } from "entities/channel/model/selectors";
 import type { ChannelItem } from "entities/channel/model/types";
 import { useDashboardData } from "features/dashboard/model/use-dashboard-data";
 
 export function ChannelsPage() {
-  const { data, isLoading } = useDashboardData();
+  const { isLoading, rootSessions, rootSessionsError } = useDashboardData(null);
+  const channels = buildChannels(rootSessions);
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
 
-  if (isLoading || !data) {
+  useEffect(() => {
+    if (channels.length === 0) {
+      if (selectedChannelId !== null) {
+        setSelectedChannelId(null);
+      }
+      return;
+    }
+
+    const selectionStillExists = channels.some((channel) => channel.id === selectedChannelId);
+    if (!selectionStillExists) {
+      setSelectedChannelId(channels[0].id);
+    }
+  }, [channels, selectedChannelId]);
+
+  if (isLoading && rootSessions.length === 0) {
     return <div className="app-shell">Loading channels…</div>;
   }
 
-  const channels = buildChannels(data.sessions);
-  const [selectedChannelId, setSelectedChannelId] = useState(channels[0]?.id ?? null);
+  if (rootSessionsError) {
+    return (
+      <div className="app-shell">
+        <div className="app-frame">
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <h2>Channels Unavailable</h2>
+                <p>The sessions API could not be reached.</p>
+              </div>
+            </div>
+            <div className="panel__body">
+              <div className="empty-state">
+                <strong>Request failed</strong>
+                <p>{rootSessionsError instanceof Error ? rootSessionsError.message : "Unknown sessions error."}</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   const selectedChannel = channels.find((channel) => channel.id === selectedChannelId) ?? channels[0];
 
   return (

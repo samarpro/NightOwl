@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from pydantic import TypeAdapter
@@ -126,6 +127,28 @@ class SessionStore:
         log.info("Resumed session %s with %d messages", row.id, len(messages))
         return session, messages
 
+    async def list_root_sessions(self) -> list[dict[str, Any]]:
+        async with self._sf() as db:
+            stmt = (
+                select(SessionRow)
+                .where(SessionRow.parent_id.is_(None))
+                .order_by(SessionRow.created_at.desc())
+            )
+            result = await db.execute(stmt)
+            rows = result.scalars().all()
+        return [_serialize_session_row(row) for row in rows]
+
+    async def list_child_sessions(self, parent_id: str) -> list[dict[str, Any]]:
+        async with self._sf() as db:
+            stmt = (
+                select(SessionRow)
+                .where(SessionRow.parent_id == parent_id)
+                .order_by(SessionRow.created_at.desc())
+            )
+            result = await db.execute(stmt)
+            rows = result.scalars().all()
+        return [_serialize_session_row(row) for row in rows]
+
     async def fail_orphaned_children(self) -> int:
         async with self._sf() as db:
             stmt = (
@@ -140,3 +163,24 @@ class SessionStore:
         if count:
             log.info("Failed %d orphaned child sessions", count)
         return count
+
+
+def _serialize_session_row(row: SessionRow) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "parentId": row.parent_id,
+        "role": row.role,
+        "state": row.state,
+        "depth": row.depth,
+        "task": row.task,
+        "label": row.label,
+        "sandboxMode": row.sandbox_mode,
+        "channelRoute": row.channel_route,
+        "createdAt": _isoformat(row.created_at),
+        "completedAt": _isoformat(row.completed_at),
+        "result": row.result,
+    }
+
+
+def _isoformat(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None

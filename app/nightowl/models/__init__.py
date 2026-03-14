@@ -1,7 +1,9 @@
 """NightOwl data models — re-export everything for convenience."""
 
 from nightowl.models.approval import (
+    ApprovalDecision,
     ApprovalRequest,
+    ApprovalResult,
     ApprovalResponse,
     RiskLevel,
     ToolCallWithRisk,
@@ -19,7 +21,9 @@ from nightowl.models.session import (
 
 __all__ = [
     "AgentCard",
+    "ApprovalDecision",
     "ApprovalRequest",
+    "ApprovalResult",
     "ApprovalResponse",
     "ChannelMessage",
     "IntentEdge",

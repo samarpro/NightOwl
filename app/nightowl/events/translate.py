@@ -181,8 +181,9 @@ def translate_runtime_event(raw: dict[str, Any]) -> RuntimeEvent | None:
             channel=raw.get("channel"),
             payload={
                 "approvalId": raw.get("approval_id"),
-                "approved": raw.get("approved"),
+                "decision": raw.get("decision"),
                 "reason": raw.get("reason"),
+                "redirectMessage": raw.get("redirect_message"),
             },
         )
 

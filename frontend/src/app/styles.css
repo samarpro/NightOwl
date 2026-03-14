@@ -252,6 +252,24 @@ a {
   overflow: auto;
 }
 
+.empty-state {
+  display: grid;
+  gap: 10px;
+  padding: 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.empty-state strong {
+  font-size: 1rem;
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
 .metric-strip {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

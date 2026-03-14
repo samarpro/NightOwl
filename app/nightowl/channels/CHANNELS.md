@@ -20,7 +20,7 @@ Defines the contract every bridge must implement:
 
 - **`normalize_inbound`** — converts raw platform payload to `ChannelMessage`
 - **`send_message`** — sends a text reply to a user
-- **`send_approval_request`** — sends an inline HITL approval prompt with approve/reject controls
+- **`send_approval_request`** — sends an inline HITL approval prompt with approve/reject/redirect controls. Redirect does not carry the replacement instruction inline; it asks the user for a follow-up message.
 
 ### ChannelRegistry (`base.py`)
 
@@ -28,8 +28,8 @@ Central registry that tracks registered bridges, last-used channel per user, and
 
 ### Bridges
 
-- **TelegramBridge** (`telegram.py`) — uses `python-telegram-bot`. Approval requests render as inline keyboard buttons.
-- **WhatsAppBridge** (`whatsapp.py`) — uses Twilio WhatsApp Business API. Approvals are text-based ("Reply APPROVE or REJECT").
+- **TelegramBridge** (`telegram.py`) — uses `python-telegram-bot`. Approval requests render as inline keyboard buttons for approve, reject, and redirect. Redirect triggers a follow-up reply prompt in the chat.
+- **WhatsAppBridge** (`whatsapp.py`) — uses Twilio WhatsApp Business API. Approvals are text-based ("Reply APPROVE …", "REJECT …", or "REDIRECT …"). After `REDIRECT`, the next user message becomes the new instruction.
 - **SMSBridge** (`sms.py`) — uses Twilio SMS API. Same text-based approval pattern as WhatsApp.
 
 Telegram is registered automatically in `main.py` when `TELEGRAM_BOT_TOKEN` is set. WhatsApp and SMS require Twilio credentials.

@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nightowl.models.approval import RiskLevel
+from nightowl.models.approval import ApprovalDecision, ApprovalResult, RiskLevel
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.tools import AgentState
 from nightowl.composio_tools.meta_tools import composio_search_tools, composio_execute
@@ -126,7 +126,9 @@ class TestComposioExecuteLowRisk:
     async def test_low_upgraded_to_high_triggers_hitl(self, manager: SessionManager):
         """Agent says low, classifier says high → HITL fires."""
         mock_gate = MagicMock()
-        mock_gate.request_approval = AsyncMock(return_value=True)
+        mock_gate.request_approval = AsyncMock(
+            return_value=ApprovalResult(decision=ApprovalDecision.APPROVE),
+        )
         parent = await manager.create_main_session("low upgraded")
         ctx = _make_ctx(parent.id, manager, gate=mock_gate)
 
@@ -155,7 +157,9 @@ class TestComposioExecuteLowRisk:
 class TestComposioExecuteMediumRisk:
     async def test_medium_risk_triggers_classifier(self, manager: SessionManager):
         mock_gate = MagicMock()
-        mock_gate.request_approval = AsyncMock(return_value=True)
+        mock_gate.request_approval = AsyncMock(
+            return_value=ApprovalResult(decision=ApprovalDecision.APPROVE),
+        )
         parent = await manager.create_main_session("medium risk")
         ctx = _make_ctx(parent.id, manager, gate=mock_gate)
 
@@ -202,7 +206,9 @@ class TestComposioExecuteMediumRisk:
     async def test_classifier_upgrade_triggers_hitl(self, manager: SessionManager):
         """Agent says medium, classifier says high → HITL fires."""
         mock_gate = MagicMock()
-        mock_gate.request_approval = AsyncMock(return_value=True)
+        mock_gate.request_approval = AsyncMock(
+            return_value=ApprovalResult(decision=ApprovalDecision.APPROVE),
+        )
         parent = await manager.create_main_session("upgraded risk")
         ctx = _make_ctx(parent.id, manager, gate=mock_gate)
 
@@ -232,7 +238,9 @@ class TestComposioExecuteHighRisk:
     async def test_high_risk_skips_classifier(self, manager: SessionManager):
         """HIGH goes straight to HITL — no need for classifier."""
         mock_gate = MagicMock()
-        mock_gate.request_approval = AsyncMock(return_value=True)
+        mock_gate.request_approval = AsyncMock(
+            return_value=ApprovalResult(decision=ApprovalDecision.APPROVE),
+        )
         parent = await manager.create_main_session("high skip classifier")
         ctx = _make_ctx(parent.id, manager, gate=mock_gate)
 
@@ -254,7 +262,9 @@ class TestComposioExecuteHighRisk:
 
     async def test_high_approved_executes_tool(self, manager: SessionManager):
         mock_gate = MagicMock()
-        mock_gate.request_approval = AsyncMock(return_value=True)
+        mock_gate.request_approval = AsyncMock(
+            return_value=ApprovalResult(decision=ApprovalDecision.APPROVE),
+        )
         parent = await manager.create_main_session("approved exec")
         ctx = _make_ctx(parent.id, manager, gate=mock_gate)
 
@@ -274,7 +284,9 @@ class TestComposioExecuteHighRisk:
 
     async def test_high_rejected_never_executes_tool(self, manager: SessionManager):
         mock_gate = MagicMock()
-        mock_gate.request_approval = AsyncMock(return_value=False)
+        mock_gate.request_approval = AsyncMock(
+            return_value=ApprovalResult(decision=ApprovalDecision.REJECT),
+        )
         parent = await manager.create_main_session("rejected exec")
         ctx = _make_ctx(parent.id, manager, gate=mock_gate)
 
@@ -294,7 +306,9 @@ class TestComposioExecuteHighRisk:
 
     async def test_critical_skips_classifier_and_gates(self, manager: SessionManager):
         mock_gate = MagicMock()
-        mock_gate.request_approval = AsyncMock(return_value=True)
+        mock_gate.request_approval = AsyncMock(
+            return_value=ApprovalResult(decision=ApprovalDecision.APPROVE),
+        )
         parent = await manager.create_main_session("critical gating")
         ctx = _make_ctx(parent.id, manager, gate=mock_gate)
 
@@ -391,7 +405,9 @@ class TestComposioExecuteParams:
     async def test_uppercase_risk_level_handled(self, manager: SessionManager):
         """LLM might send 'HIGH' or 'Low' — must normalise."""
         mock_gate = MagicMock()
-        mock_gate.request_approval = AsyncMock(return_value=True)
+        mock_gate.request_approval = AsyncMock(
+            return_value=ApprovalResult(decision=ApprovalDecision.APPROVE),
+        )
         parent = await manager.create_main_session("uppercase risk")
         ctx = _make_ctx(parent.id, manager, gate=mock_gate)
 

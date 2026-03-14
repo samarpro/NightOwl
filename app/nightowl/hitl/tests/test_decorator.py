@@ -24,7 +24,7 @@ import pytest
 
 from nightowl.hitl.decorator import hitl_gated
 from nightowl.hitl.gate import HITLGate
-from nightowl.models.approval import RiskLevel
+from nightowl.models.approval import ApprovalDecision, ApprovalResult, RiskLevel
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.tools import AgentState
 
@@ -106,9 +106,14 @@ class TestRiskLevelParsing:
     async def test_valid_risk_strings_accepted(self, manager: SessionManager):
         """All four risk level strings should parse without error."""
         for risk in ("low", "medium", "high", "critical"):
-            ctx = await _make_ctx_with_gate(manager, gate=MagicMock(
-                request_approval=AsyncMock(return_value=True),
-            ))
+            ctx = await _make_ctx_with_gate(
+                manager,
+                gate=MagicMock(
+                    request_approval=AsyncMock(
+                        return_value=ApprovalResult(decision=ApprovalDecision.APPROVE),
+                    ),
+                ),
+            )
             with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock:
                 mock.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
                 result = await _dummy_tool(ctx, risk_level=risk, risk_justification="test")
@@ -151,7 +156,9 @@ class TestRiskLevelParsing:
 
 class TestHighCriticalSkipsClassifier:
     async def test_high_risk_does_not_call_classifier(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         with patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify:
@@ -160,7 +167,9 @@ class TestHighCriticalSkipsClassifier:
         mock_verify.assert_not_called()
 
     async def test_critical_risk_does_not_call_classifier(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         with patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify:
@@ -169,7 +178,9 @@ class TestHighCriticalSkipsClassifier:
         mock_verify.assert_not_called()
 
     async def test_high_risk_goes_straight_to_gate(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         with patch("nightowl.hitl.decorator._default_verify_risk"):
@@ -178,7 +189,9 @@ class TestHighCriticalSkipsClassifier:
         gate.request_approval.assert_called_once()
 
     async def test_critical_risk_goes_straight_to_gate(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         with patch("nightowl.hitl.decorator._default_verify_risk"):
@@ -203,7 +216,9 @@ class TestLowMediumRunsClassifier:
         mock_verify.assert_called_once()
 
     async def test_medium_risk_runs_classifier(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
@@ -240,7 +255,9 @@ class TestLowMediumRunsClassifier:
 
 class TestClassifierUpgradeTriggersGate:
     async def test_low_upgraded_to_high_triggers_gate(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
@@ -250,7 +267,9 @@ class TestClassifierUpgradeTriggersGate:
         gate.request_approval.assert_called_once()
 
     async def test_low_upgraded_to_medium_triggers_gate(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
@@ -260,7 +279,9 @@ class TestClassifierUpgradeTriggersGate:
         gate.request_approval.assert_called_once()
 
     async def test_low_confirmed_low_skips_gate(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
@@ -277,7 +298,9 @@ class TestClassifierUpgradeTriggersGate:
 
 class TestApprovalOutcome:
     async def test_approved_calls_wrapped_tool(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         result = await _dummy_tool(ctx, query="go", risk_level="high", risk_justification="test")
@@ -285,20 +308,47 @@ class TestApprovalOutcome:
         assert result == "executed:go"
 
     async def test_denied_returns_denial_string(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=False))
+        gate = MagicMock(
+            request_approval=AsyncMock(
+                return_value=ApprovalResult(
+                    decision=ApprovalDecision.REJECT,
+                    reason="Too risky",
+                ),
+            ),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         result = await _dummy_tool(ctx, query="go", risk_level="high", risk_justification="test")
 
         assert "denied" in result.lower() or "rejected" in result.lower()
+        assert "too risky" in result.lower()
 
     async def test_denied_never_calls_wrapped_tool(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=False))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.REJECT)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         _spy_tool_inner.reset_mock()
         await _spy_tool(ctx, action="delete_everything", risk_level="critical", risk_justification="test")
 
+        _spy_tool_inner.assert_not_called()
+
+    async def test_redirect_returns_redirect_message_without_calling_tool(self, manager: SessionManager):
+        gate = MagicMock(
+            request_approval=AsyncMock(
+                return_value=ApprovalResult(
+                    decision=ApprovalDecision.REDIRECT,
+                    redirect_message="Ask the user which account to use.",
+                ),
+            ),
+        )
+        ctx = await _make_ctx_with_gate(manager, gate=gate)
+
+        _spy_tool_inner.reset_mock()
+        result = await _spy_tool(ctx, action="charge_card", risk_level="critical", risk_justification="test")
+
+        assert result == ""
         _spy_tool_inner.assert_not_called()
 
     async def test_approved_passes_original_kwargs_to_tool(self, manager: SessionManager):
@@ -309,7 +359,9 @@ class TestApprovalOutcome:
             received.update(kwargs)
             return "ok"
 
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
         await capture_tool(ctx, query="restaurants", limit=5, risk_level="high", risk_justification="")
 
@@ -323,7 +375,9 @@ class TestApprovalOutcome:
 
 class TestGateArguments:
     async def test_gate_receives_session_id(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         await _dummy_tool(ctx, risk_level="high", risk_justification="test")
@@ -333,7 +387,9 @@ class TestGateArguments:
         assert ctx.deps.session_id in call_str
 
     async def test_gate_receives_tool_name(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         await _dummy_tool(ctx, risk_level="high", risk_justification="test")
@@ -342,7 +398,9 @@ class TestGateArguments:
         assert "_dummy_tool" in call_str
 
     async def test_gate_receives_verified_risk_level(self, manager: SessionManager):
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         await _dummy_tool(ctx, risk_level="critical", risk_justification="test")
@@ -391,7 +449,9 @@ class TestNoGateConfigured:
 class TestClassifierFailure:
     async def test_classifier_error_falls_back_to_self_reported(self, manager: SessionManager):
         """If the classifier throws, use the agent's self-reported risk."""
-        gate = MagicMock(request_approval=AsyncMock(return_value=True))
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
         with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:

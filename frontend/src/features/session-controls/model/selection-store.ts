@@ -8,8 +8,8 @@ type SelectionState = {
 };
 
 export const useSelectionStore = create<SelectionState>((set) => ({
-  selectedSessionId: "sess-main",
-  selectedIntentId: "intent-root",
+  selectedSessionId: null,
+  selectedIntentId: null,
   selectSession: (selectedSessionId) => set({ selectedSessionId }),
   selectIntent: (selectedIntentId) => set({ selectedIntentId })
 }));
