@@ -37,9 +37,14 @@ Background child sessions are launched as `asyncio.Task`s via the configurable `
 
 Executes Pydantic AI agents using `agent.iter()` for streaming node-level visibility. Each node (model request, tool call, end) emits an event via the callback.
 
-Key functions:
+The runner provides two layers of abstraction:
 
-- **`process_message`** — the core processing function. Drains pending child completions from the queue first, then feeds the new message through the agent. Used by all entrypoints.
+- **`SessionRuntime`** — a stateful wrapper holding an agent, deps, and message history. Created via `create_session_runtime()`. The `IngressService` uses this for long-lived channel sessions.
+- **`process_runtime_message`** — runs a single turn through a `SessionRuntime`, updating its history in place.
+
+Lower-level functions:
+
+- **`process_message`** — drains pending child completions from the queue first, then feeds the new message through the agent. Used by the CLI's interactive loop.
 - **`run_child_session`** — entry point for background children. Runs the task, waits for sub-children if any were spawned, then completes.
 - **`run_interactive`** — multi-turn REPL loop wrapping `process_message`.
 

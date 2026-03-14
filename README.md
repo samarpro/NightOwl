@@ -51,6 +51,7 @@ The app reads all configuration from environment variables or a `.env` file in `
 |----------|---------|
 | `BEDROCK_REGION` / `BEDROCK_MODEL` | AWS Bedrock LLM endpoint |
 | `COMPOSIO_API_KEY` | Composio MCP gateway auth |
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot API token |
 | `REDIS_URL` | Event bus (defaults to `redis://localhost:6379`) |
 | `DATABASE_URL` | PostgreSQL connection string |
 
@@ -81,16 +82,18 @@ pdm run pytest
 
 ```
 app/nightowl/
+├── api/            # FastAPI routers (health, ingest, approvals, webhooks, WebSocket)
 ├── sessions/       # Session manager, agent runner, spawn/list/send tools
 ├── hitl/           # Risk classifier and approval gate
 ├── composio_tools/ # Composio MCP tool router and meta-tools
-├── channels/       # Channel bridge abstraction (Telegram, etc.)
+├── channels/       # Channel bridges (Telegram, WhatsApp, SMS)
+├── events/         # Event bus (Redis), runtime broadcaster, WS event translation
+├── ingest/         # Ingress service — routes channel messages to sessions
 ├── models/         # Pydantic data models
 ├── config.py       # pydantic-settings configuration
 ├── db.py           # Database initialization
-├── events.py       # Redis-backed event bus
 ├── cli.py          # Interactive CLI chat
-└── main.py         # FastAPI app entrypoint
+└── main.py         # FastAPI app entrypoint + lifespan wiring
 ```
 
 ## Documentation

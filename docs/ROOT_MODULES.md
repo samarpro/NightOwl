@@ -4,7 +4,7 @@ Top-level files in `app/nightowl/` that wire the application together.
 
 ## `main.py` — FastAPI Entrypoint
 
-Creates the FastAPI app with a lifespan context manager. On startup: initializes the database, creates a `SessionManager`, and sets up a broadcast queue. On shutdown: closes the database connection. Serves the health endpoint at `/api/v1/health`.
+Factory function `create_app()` builds the FastAPI application with all routers (health, ingest, approvals, webhooks, WebSocket). The lifespan context manager initializes: database, `RuntimeBroadcaster`, `SessionManager`, `ChannelRegistry` (auto-registers Telegram if token is set), `HITLGate`, and `IngressService`. All are stored on `app.state` for router access.
 
 ## `cli.py` — Interactive Chat
 
@@ -14,11 +14,7 @@ Run it with `pdm run chat` from the `app/` directory.
 
 ## `config.py` — Configuration
 
-All configuration is via `pydantic-settings`, loaded from environment variables or `.env`. Key settings: Bedrock region/model, Composio API key, Redis URL, database URL, session spawn limits (max depth, max children), and HITL timeout.
-
-## `events.py` — Event Bus
-
-Redis pub/sub event bus on a single `nightowl:events` channel. All system events (session lifecycle, approvals, node progress) flow through it. Multiple consumers can subscribe independently — the dashboard WebSocket, CLI approval listener, and activity feed all read from the same channel with optional type filtering.
+All configuration is via `pydantic-settings`, loaded from environment variables or `.env`. Key settings: Bedrock region/model, Composio API key, channel tokens (Telegram bot token + webhook secret, Twilio credentials), Redis URL, database URL, session spawn limits (max depth, max children), and HITL timeout.
 
 ## `db.py` — Database
 
