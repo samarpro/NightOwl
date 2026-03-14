@@ -1,5 +1,7 @@
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { buildSkillDraftDocument, buildSkillUploadSelection } from "features/skill-import/model/skill-import";
+import { useSaveSkillDraft, useUploadSkillSelection } from "features/skill-import/model/use-skill-import";
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 
 type SettingsSectionId = "skills-import" | "models";
@@ -22,19 +24,12 @@ type ModelCard = {
   capabilities: string[];
 };
 
-type ImportCard = {
-  id: string;
-  title: string;
-  platform: string;
-  mode: string;
-  description: string;
-  steps: string[];
-};
-
 type ImportSelection = {
   count: number;
+  files: File[];
   label: string;
   names: string[];
+  rejectedCount: number;
 };
 
 type SkillEditorAction = {
@@ -50,13 +45,9 @@ const settingsSections: SettingsSection[] = [
     eyebrow: "NightOwl Skills",
     title: "Import skill packages from local files and folders.",
     description:
-      "Bring skill packs into the system, validate manifests, and support platform-specific import paths for operators.",
-    summary: "File and folder import flows for macOS and Windows skill bundles.",
-    metrics: [
-      { label: "Imported bundles", value: "12" },
-      { label: "Pending review", value: "3" },
-      { label: "Trusted sources", value: "5" }
-    ]
+      "Bring skill packs into the system, validate manifests, and save custom skill drafts into the runtime.",
+    summary: "One import surface for markdown files or extracted folders, plus a draft editor that saves into the skills API.",
+    metrics: []
   },
   {
     id: "models",
@@ -116,41 +107,6 @@ const modelCards: ModelCard[] = [
     badge: "Analysis",
     summary: "Used for deliberate analytical passes where slower but more explicit reasoning is acceptable.",
     capabilities: ["Deep analysis", "Structured output", "Policy review"]
-  }
-];
-
-const importCards: ImportCard[] = [
-  {
-    id: "macos-file",
-    title: "macOS file import",
-    platform: "macOS",
-    mode: "File",
-    description: "Choose a zipped skill package or manifest file from Finder and stage it for validation.",
-    steps: ["Open file picker", "Inspect manifest preview", "Queue import into review"]
-  },
-  {
-    id: "macos-folder",
-    title: "macOS folder import",
-    platform: "macOS",
-    mode: "Folder",
-    description: "Point to a local skill folder so NightOwl can ingest the full directory structure.",
-    steps: ["Open folder chooser", "Scan nested assets", "Validate hooks and dependencies"]
-  },
-  {
-    id: "windows-file",
-    title: "Windows file import",
-    platform: "Windows",
-    mode: "File",
-    description: "Import an archived skill bundle or loose manifest from the Windows file explorer.",
-    steps: ["Select `.zip` or manifest", "Normalize path separators", "Run trust checks before enablement"]
-  },
-  {
-    id: "windows-folder",
-    title: "Windows folder import",
-    platform: "Windows",
-    mode: "Folder",
-    description: "Ingest an extracted skill directory while preserving scripts, assets, and templates.",
-    steps: ["Browse folder tree", "Resolve relative assets", "Show import diff before activation"]
   }
 ];
 
@@ -275,14 +231,16 @@ export function SettingsPage() {
                 <p>{selectedSection.summary}</p>
               </section>
 
-              <section className="channel-detail-grid">
-                {selectedSection.metrics.map((metric) => (
-                  <div className="metric-card" key={metric.label}>
-                    <span>{metric.label}</span>
-                    <strong>{metric.value}</strong>
-                  </div>
-                ))}
-              </section>
+              {selectedSection.metrics.length > 0 ? (
+                <section className="channel-detail-grid">
+                  {selectedSection.metrics.map((metric) => (
+                    <div className="metric-card" key={metric.label}>
+                      <span>{metric.label}</span>
+                      <strong>{metric.value}</strong>
+                    </div>
+                  ))}
+                </section>
+              ) : null}
 
               {selectedSection.id === "models" ? (
                 <ModelsPanel activeModelName={activeModelName} onUseModel={setActiveModelName} />
@@ -346,36 +304,35 @@ function ModelsPanel({
 }
 
 function SkillsImportPanel() {
-  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const [selections, setSelections] = useState<Record<string, ImportSelection>>({});
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const [selection, setSelection] = useState<ImportSelection | null>(null);
+  const uploadMutation = useUploadSkillSelection();
 
-  function openPicker(cardId: string) {
-    inputRefs.current[cardId]?.click();
+  function openFilePicker() {
+    fileInputRef.current?.click();
   }
 
-  function handleSelection(card: ImportCard, event: ChangeEvent<HTMLInputElement>) {
+  function openFolderPicker() {
+    folderInputRef.current?.click();
+  }
+
+  function handleSelection(mode: "files" | "folder", event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
 
     if (files.length === 0) {
       return;
     }
 
-    const names = files.map((file) => file.webkitRelativePath || file.name);
-    const label =
-      card.mode === "Folder"
-        ? summarizeFolderSelection(names)
-        : files.length === 1
-          ? files[0].name
-          : `${files.length} files selected`;
+    const nextSelection = buildSkillUploadSelection(files, mode);
 
-    setSelections((current) => ({
-      ...current,
-      [card.id]: {
-        count: files.length,
-        label,
-        names
-      }
-    }));
+    setSelection({
+      count: nextSelection.candidates.length,
+      files: nextSelection.candidates,
+      label: nextSelection.label,
+      names: nextSelection.names,
+      rejectedCount: nextSelection.rejectedCount
+    });
 
     event.target.value = "";
   }
@@ -383,73 +340,110 @@ function SkillsImportPanel() {
   return (
     <section className="settings-panel-grid">
       <CustomSkillComposer />
-      {importCards.map((card) => (
-        <article className="settings-detail-card" key={card.title}>
-          <input
-            className="settings-import-input"
-            multiple={card.mode === "Folder"}
-            onChange={(event) => handleSelection(card, event)}
-            ref={(node) => {
-              inputRefs.current[card.id] = node;
-              if (node && card.mode === "Folder") {
-                node.setAttribute("directory", "");
-                node.setAttribute("webkitdirectory", "");
+      <article className="settings-detail-card">
+        <input
+          accept=".md,.markdown,text/markdown"
+          className="settings-import-input"
+          multiple
+          onChange={(event) => handleSelection("files", event)}
+          ref={fileInputRef}
+          type="file"
+        />
+        <input
+          className="settings-import-input"
+          multiple
+          onChange={(event) => handleSelection("folder", event)}
+          ref={(node) => {
+            folderInputRef.current = node;
+            if (node) {
+              node.setAttribute("directory", "");
+              node.setAttribute("webkitdirectory", "");
+            }
+          }}
+          type="file"
+        />
+        <div className="panel__header settings-detail-card__header">
+          <div>
+            <span className="settings-nav-item__eyebrow">Unified import</span>
+            <h3>Import skill markdown from files or extracted folders.</h3>
+            <p>
+              Use one queue for direct markdown uploads or folder scans. Folder imports upload nested
+              <code>SKILL.md</code> files because the current API does not accept bundled resources yet.
+            </p>
+          </div>
+          <span className="badge">API-backed</span>
+        </div>
+        <div className="settings-import-actions">
+          <button className="button button--primary" onClick={openFilePicker} type="button">
+            Select files
+          </button>
+          <button className="button button--ghost" onClick={openFolderPicker} type="button">
+            Select folder
+          </button>
+          <button
+            className="button button--primary"
+            disabled={!selection || selection.count === 0 || uploadMutation.isPending}
+            onClick={() => {
+              if (!selection || selection.count === 0) {
+                return;
               }
+
+              void uploadMutation.mutateAsync({
+                files: selection.files
+              });
             }}
-            type="file"
-          />
-          <div className="panel__header settings-detail-card__header">
-            <div>
-              <span className="settings-nav-item__eyebrow">{card.platform}</span>
-              <h3>{card.title}</h3>
-              <p>{card.description}</p>
-            </div>
-            <span className="badge">{card.mode}</span>
-          </div>
-          <div className="settings-import-actions">
-            <button className="button button--primary" onClick={() => openPicker(card.id)} type="button">
-              Select {card.mode.toLowerCase()}
-            </button>
-            <button className="button button--ghost" type="button">
-              Preview import
-            </button>
-          </div>
-          <div className="settings-import-selection">
-            {selections[card.id] ? (
-              <>
-                <strong>{selections[card.id].label}</strong>
-                <span>{selections[card.id].count} item(s) ready for import</span>
-                <div className="settings-import-selection__list">
-                  {selections[card.id].names.slice(0, 3).map((name) => (
-                    <span className="channel-route-pill" key={name}>
-                      {name}
-                    </span>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <>
-                <strong>No selection yet</strong>
-                <span>Use the native picker to choose a file or folder for this platform flow.</span>
-              </>
-            )}
-          </div>
-          <div className="settings-detail-card__body">
-            {card.steps.map((item) => (
-              <div className="settings-detail-row" key={item}>
-                <span className="settings-detail-row__dot" aria-hidden="true" />
-                <span>{item}</span>
+            type="button"
+          >
+            {uploadMutation.isPending ? "Uploading..." : "Upload selection"}
+          </button>
+        </div>
+        <div className="settings-import-selection">
+          {selection ? (
+            <>
+              <strong>{selection.label}</strong>
+              <span>{selection.count} skill file(s) ready for upload</span>
+              {selection.rejectedCount > 0 ? (
+                <span>{selection.rejectedCount} non-skill file(s) skipped from this selection</span>
+              ) : null}
+              <div className="settings-import-selection__list">
+                {selection.names.slice(0, 4).map((name) => (
+                  <span className="channel-route-pill" key={name}>
+                    {name}
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
-        </article>
-      ))}
+            </>
+          ) : (
+            <>
+              <strong>No selection yet</strong>
+              <span>Select markdown files or scan an extracted folder for nested skill manifests.</span>
+            </>
+          )}
+          {uploadMutation.isError ? <span>{uploadMutation.error.message}</span> : null}
+          {uploadMutation.isSuccess ? (
+            <span>{uploadMutation.data.length} skill file(s) saved to the skills API.</span>
+          ) : null}
+        </div>
+        <div className="settings-detail-card__body">
+          {[
+            "Direct file upload accepts markdown documents with YAML frontmatter.",
+            "Folder upload scans for nested SKILL.md files and ignores everything else.",
+            "Each queued skill is sent to /api/v1/skills/upload and stored immediately."
+          ].map((item) => (
+            <div className="settings-detail-row" key={item}>
+              <span className="settings-detail-row__dot" aria-hidden="true" />
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </article>
     </section>
   );
 }
 
 function CustomSkillComposer() {
   const [documentHtml, setDocumentHtml] = useState(initialSkillDraft);
+  const saveMutation = useSaveSkillDraft();
   const editor = useEditor({
     extensions: [StarterKit],
     content: initialSkillDraft,
@@ -477,6 +471,8 @@ function CustomSkillComposer() {
       words
     };
   }, [documentHtml, editor]);
+
+  const draftDocument = useMemo(() => buildSkillDraftDocument(documentHtml), [documentHtml]);
 
   return (
     <article className="settings-detail-card settings-detail-card--skill-editor">
@@ -518,6 +514,18 @@ function CustomSkillComposer() {
           >
             Clear
           </button>
+          <button
+            className="button button--primary settings-skill-editor__tool"
+            disabled={saveMutation.isPending}
+            onClick={() => {
+              void saveMutation.mutateAsync({
+                content: draftDocument.content
+              });
+            }}
+            type="button"
+          >
+            {saveMutation.isPending ? "Saving..." : "Save skill"}
+          </button>
         </div>
 
         <EditorContent editor={editor} />
@@ -528,6 +536,7 @@ function CustomSkillComposer() {
           <strong>Draft summary</strong>
           <span>{documentStats.words} words</span>
           <span>{documentStats.blocks} content blocks</span>
+          <span>Saved as <code>{draftDocument.name}</code></span>
         </div>
         <div className="settings-import-selection">
           <strong>Good skill sections</strong>
@@ -538,13 +547,15 @@ function CustomSkillComposer() {
             <span className="channel-route-pill">Safety</span>
           </div>
         </div>
+        <div className="settings-import-selection">
+          <strong>Save status</strong>
+          {saveMutation.isError ? <span>{saveMutation.error.message}</span> : null}
+          {saveMutation.isSuccess ? <span>Saved to skills API as {saveMutation.data.name}.</span> : null}
+          {!saveMutation.isError && !saveMutation.isSuccess ? (
+            <span>Save writes a generated SKILL.md document to the API.</span>
+          ) : null}
+        </div>
       </div>
     </article>
   );
-}
-
-function summarizeFolderSelection(names: string[]) {
-  const firstPath = names[0] ?? "";
-  const root = firstPath.split("/")[0] || firstPath.split("\\")[0] || "Selected folder";
-  return root;
 }

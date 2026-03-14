@@ -22,6 +22,19 @@ export const ingestMessageResponseSchema = z.object({
   sessionId: z.string(),
   created: z.boolean()
 });
+export const skillSaveResponseSchema = z.object({
+  id: z.number().int().nonnegative(),
+  name: z.string().min(1),
+  status: z.literal("saved")
+});
+export const skillSummarySchema = z.object({
+  id: z.number().int().nonnegative(),
+  name: z.string().min(1),
+  description: z.string(),
+  metadata: z.record(z.any()),
+  user_invocable: z.boolean(),
+  enabled: z.boolean()
+});
 
 export const sessionNodeSchema = z.object({
   id: z.string(),
@@ -133,6 +146,8 @@ export const dashboardSnapshotSchema = z.object({
 export type DashboardSnapshot = z.infer<typeof dashboardSnapshotSchema>;
 export type ChannelMessageDto = z.infer<typeof channelMessageSchema>;
 export type IngestMessageResponseDto = z.infer<typeof ingestMessageResponseSchema>;
+export type SkillSaveResponseDto = z.infer<typeof skillSaveResponseSchema>;
+export type SkillSummaryDto = z.infer<typeof skillSummarySchema>;
 export type SessionNodeDto = z.infer<typeof sessionNodeSchema>;
 export type ApiSessionDto = z.infer<typeof apiSessionSchema>;
 export type IntentNodeDto = z.infer<typeof intentNodeSchema>;
