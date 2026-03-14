@@ -29,11 +29,11 @@ Calls Claude Haiku via Bedrock to verify the agent's self-reported risk. Uses a 
 
 `HITLGate` manages the approval lifecycle:
 
-1. Creates a pending approval with a unique ID and expiry timestamp
+1. Creates a pending approval with a unique ID
 2. Broadcasts `approval:required` via the event bus (picked up by dashboard WebSocket and CLI)
 3. Resolves the session's channel — walks up the parent chain if the approval originates from a child session, so child HITL requests reach the user's messaging app
 4. Sends an inline approval request through the appropriate bridge (Telegram inline keyboard, WhatsApp/SMS text prompt)
-5. Blocks on an `asyncio.Event` until resolved or timeout
-6. First response wins — dashboard, WebSocket, Telegram callback query, and channel all race; whichever responds first takes effect
+5. Blocks indefinitely on an `asyncio.Event` until the human responds — no timeout
+6. First response wins — dashboard, WebSocket, Telegram callback query, and WhatsApp text reply all race; whichever responds first takes effect
 
 The gate is shared across all sessions via the `SessionManager` and receives the `ChannelRegistry` at construction time.

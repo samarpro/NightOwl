@@ -79,9 +79,14 @@ Generates system prompts scoped to session role. Key rules injected into all pro
 
 - **Relay rule** — the user cannot see child agent messages; the parent must relay all content verbatim
 - **Auth rule** — agents never worry about authentication; the system handles OAuth flows transparently
+- **Sandbox rule** — prefer short focused `bash_exec` commands, GitHub creds are pre-configured in containers
 - **No-poll rule** — parents wait for completion events, never poll
 
 Main agents get the full identity and all tool descriptions. Orchestrators get their task context, parent reference, and can message their parent. Leaf agents get an explicit "you cannot spawn" instruction but can still message their parent.
+
+### Shadow Agent (`shadow.py`)
+
+`ShadowManager` creates toolless clones of running agent sessions. The shadow has the same model, system prompt, and message history as the live agent, but no tools. Users chat with it via the dashboard to ask questions about what the agent is doing without blocking or polluting the live context. If a correction is needed, `shadow.correct()` pushes a steering message into the live session's queue.
 
 ### Context Compaction (`context_compaction.py`)
 

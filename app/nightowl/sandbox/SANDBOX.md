@@ -10,9 +10,11 @@ Containers are created lazily on first tool use via `ensure_container()` — no 
 
 `DockerSandboxManager` tracks session-to-container mappings and provides the core operations: create, exec, cleanup, and file extraction. All Docker operations run in a thread executor to avoid blocking the event loop.
 
+On container creation, the manager fetches active Composio credentials (currently GitHub tokens) and injects them as environment variables. A git credential helper is automatically configured so `git clone`/`push` with HTTPS URLs works without the agent needing to handle authentication.
+
 ## Tools
 
-All sandbox tools are `@hitl_gated` — the agent must self-report risk and the HITL system gates execution.
+Execution tools are `@hitl_gated` — the agent must self-report risk. File tools are ungated (read-only or contained writes).
 
 ### `bash_exec` (`bash_tool.py`)
 
@@ -36,6 +38,14 @@ Desktop automation via Xvfb + VNC inside a computer-use container:
 - **`computer_use_action`** — mouse clicks, keyboard input, scrolling by coordinates
 
 Commands go through a `computer-use-bridge` helper script.
+
+### File tools (`file_tools.py`)
+
+Three ungated tools for file operations inside containers:
+
+- **`sandbox_read`** — read a file with line numbers, optional offset/limit for large files
+- **`sandbox_write`** — write a file (base64-encoded transport to avoid escaping issues), creates parent dirs
+- **`sandbox_ls`** — list directory contents or find files by glob pattern
 
 ## Docker Images
 

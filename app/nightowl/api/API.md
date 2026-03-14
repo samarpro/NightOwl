@@ -20,6 +20,8 @@ FastAPI routers that expose NightOwl's HTTP and WebSocket interface. All routes 
 
 `POST /api/v1/channels/telegram/webhook` — Telegram Bot API webhook endpoint. Validates the secret token header, handles two payload types: regular messages (normalized and forwarded to `IngressService`) and callback queries (inline keyboard button presses for HITL approve/reject, resolved directly via the gate). Answers callback queries to clear Telegram's loading spinner.
 
+`POST /api/v1/channels/whatsapp/webhook` — Twilio WhatsApp webhook (form-encoded). Normalizes inbound messages and forwards to `IngressService`. Also handles text-based HITL approval replies ("APPROVE {id}" / "REJECT {id}").
+
 `GET /api/v1/composio/auth/callback` — Composio redirects here when a user completes an OAuth flow. Resolves the pending `AuthWaiter` event so the blocked tool execution can retry.
 
 ### Skills (`routers/skills.py`)
@@ -32,6 +34,20 @@ CRUD API for skill management:
 - `POST /api/v1/skills/` — create/update from raw content
 - `DELETE /api/v1/skills/{name}` — delete skill and its resources
 - `PATCH /api/v1/skills/{name}/toggle` — enable or disable
+
+### Observability (`routers/observability.py`)
+
+- `GET /api/v1/observability/intent-graph/{session_id}` — current intent graph
+- `GET /api/v1/observability/intent-graphs` — all session graphs
+- `GET /api/v1/observability/tokens/{session_id}?last=N` — recent raw token entries
+- `POST /api/v1/observability/intent-graph/{session_id}/process` — manually trigger classification
+
+### Shadow (`routers/shadow.py`)
+
+- `POST /api/v1/sessions/{session_id}/shadow` — create a shadow agent for a live session
+- `POST /api/v1/shadow/{shadow_id}/message` — chat with the shadow
+- `POST /api/v1/shadow/{shadow_id}/correct` — push a correction to the live agent
+- `DELETE /api/v1/shadow/{shadow_id}` — destroy a shadow
 
 ### WebSocket (`routers/websocket.py`)
 
