@@ -1,156 +1,145 @@
 """Tests for the HITL approval gate.
 
 Module under test: nightowl/hitl/gate.py
-Class: HITLGate
-Methods:
-  - request_approval(session_id, tool_name, tool_args, risk_level) -> bool
-  - resolve_approval(approval_id, approved, reason=None)
-
-The gate creates an ApprovalRequest, broadcasts it via WebSocket, sends to the
-user's last channel (inline keyboard), then waits on an asyncio.Event with timeout.
-First response wins.
+Uses FakeEventBus from conftest (in-memory, same interface as Redis EventBus).
 """
 
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nightowl.models.approval import ApprovalRequest, RiskLevel
+from nightowl.models.approval import RiskLevel
 from nightowl.hitl.gate import HITLGate
 from nightowl.sessions.manager import SessionManager
 
 
 # ---------------------------------------------------------------------------
-# Construction
+# Approval flow: approve, reject, timeout
 # ---------------------------------------------------------------------------
 
 
-class TestHITLGateConstruction:
-    def test_creates_with_manager_and_broadcast(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast)
-        assert gate is not None
-
-    def test_creates_with_custom_timeout(self, manager: SessionManager):
-        gate = HITLGate(manager=manager, timeout_seconds=60)
-        assert gate._timeout_seconds == 60
-
-    def test_default_timeout_from_settings(self, manager: SessionManager):
-        gate = HITLGate(manager=manager)
-        # Should use settings.hitl_timeout_seconds (120 by default)
-        assert gate._timeout_seconds == 120
-
-
-# ---------------------------------------------------------------------------
-# request_approval — happy paths
-# ---------------------------------------------------------------------------
-
-
-class TestRequestApproval:
-    async def test_creates_approval_request(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+class TestApprovalFlow:
+    async def test_approved_returns_true(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()  # consume session:created
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=5)
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=5)
 
-        # Resolve approval immediately from a background task
         async def auto_approve():
-            event = await asyncio.wait_for(broadcast.get(), timeout=2)
-            assert event["type"] == "approval:required"
-            approval_id = event["approval_id"]
-            gate.resolve_approval(approval_id, approved=True)
+            async for event in bus.subscribe(types={"approval:required"}):
+                gate.resolve_approval(event["approval_id"], approved=True)
+                break
 
         task = asyncio.create_task(auto_approve())
-        approved = await gate.request_approval(
+        result = await gate.request_approval(
             session_id=session.id,
             tool_name="GMAIL_SEND",
             tool_args={"to": "alice@example.com"},
             risk_level=RiskLevel.HIGH,
         )
         await task
+        assert result is True
 
-        assert approved is True
-
-    async def test_rejected_approval_returns_false(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+    async def test_rejected_returns_false(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=5)
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=5)
 
         async def auto_reject():
-            event = await asyncio.wait_for(broadcast.get(), timeout=2)
-            gate.resolve_approval(event["approval_id"], approved=False, reason="Too risky")
+            async for event in bus.subscribe(types={"approval:required"}):
+                gate.resolve_approval(event["approval_id"], approved=False, reason="Too risky")
+                break
 
         task = asyncio.create_task(auto_reject())
-        approved = await gate.request_approval(
+        result = await gate.request_approval(
             session_id=session.id,
             tool_name="DATABASE_DELETE",
             tool_args={"table": "users"},
             risk_level=RiskLevel.CRITICAL,
         )
         await task
-
-        assert approved is False
+        assert result is False
 
     async def test_timeout_returns_false(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=0.1)
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=0.1)
 
-        # Nobody resolves — should timeout
-        approved = await gate.request_approval(
+        result = await gate.request_approval(
             session_id=session.id,
             tool_name="GMAIL_SEND",
             tool_args={},
             risk_level=RiskLevel.HIGH,
         )
+        assert result is False
 
-        assert approved is False
-
-
-# ---------------------------------------------------------------------------
-# Broadcast events
-# ---------------------------------------------------------------------------
-
-
-class TestApprovalBroadcast:
-    async def test_broadcasts_approval_required_event(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+    async def test_first_response_wins_approve(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()  # consume session:created
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=0.1)
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=5)
 
-        # Will timeout, but we care about the broadcast
-        await gate.request_approval(
+        async def double_resolve():
+            async for event in bus.subscribe(types={"approval:required"}):
+                gate.resolve_approval(event["approval_id"], approved=True)
+                gate.resolve_approval(event["approval_id"], approved=False)
+                break
+
+        task = asyncio.create_task(double_resolve())
+        result = await gate.request_approval(
             session_id=session.id,
-            tool_name="GMAIL_SEND",
-            tool_args={"to": "bob@example.com"},
+            tool_name="TOOL",
+            tool_args={},
             risk_level=RiskLevel.HIGH,
         )
+        await task
+        assert result is True
 
-        # The broadcast should have received an approval:required event
-        # (before the timeout consumed it)
-        # We test this by checking that the gate emitted the event
-
-    async def test_broadcast_event_contains_required_fields(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+    async def test_first_response_wins_reject(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()  # consume session:created
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=5)
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=5)
+
+        async def double_resolve():
+            async for event in bus.subscribe(types={"approval:required"}):
+                gate.resolve_approval(event["approval_id"], approved=False)
+                gate.resolve_approval(event["approval_id"], approved=True)
+                break
+
+        task = asyncio.create_task(double_resolve())
+        result = await gate.request_approval(
+            session_id=session.id,
+            tool_name="TOOL",
+            tool_args={},
+            risk_level=RiskLevel.HIGH,
+        )
+        await task
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# Broadcast event content
+# ---------------------------------------------------------------------------
+
+
+class TestBroadcastEvents:
+    async def test_approval_required_event_has_all_fields(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
+        session = await manager.create_main_session("task")
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=5)
 
         async def capture_and_resolve():
-            event = await asyncio.wait_for(broadcast.get(), timeout=2)
-            assert event["type"] == "approval:required"
-            assert "approval_id" in event
-            assert event["session_id"] == session.id
-            assert event["tool_name"] == "GMAIL_SEND"
-            assert event["tool_args"] == {"to": "bob@example.com"}
-            assert event["risk_level"] == RiskLevel.HIGH
-            gate.resolve_approval(event["approval_id"], approved=True)
+            async for event in bus.subscribe(types={"approval:required"}):
+                assert event["type"] == "approval:required"
+                assert "approval_id" in event
+                assert event["session_id"] == session.id
+                assert event["tool_name"] == "GMAIL_SEND"
+                assert event["tool_args"] == {"to": "bob@example.com"}
+                # risk_level may be string after JSON round-trip
+                assert str(event["risk_level"]) == str(RiskLevel.HIGH)
+                gate.resolve_approval(event["approval_id"], approved=True)
+                break
 
         task = asyncio.create_task(capture_and_resolve())
         await gate.request_approval(
@@ -161,23 +150,23 @@ class TestApprovalBroadcast:
         )
         await task
 
-    async def test_broadcasts_approval_resolved_event(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+    async def test_resolved_event_emitted_on_approve(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()  # consume session:created
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=5)
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=5)
 
-        async def resolve_and_check():
-            # First: approval:required
-            req_event = await asyncio.wait_for(broadcast.get(), timeout=2)
-            gate.resolve_approval(req_event["approval_id"], approved=True)
-            # Second: approval:resolved
-            res_event = await asyncio.wait_for(broadcast.get(), timeout=2)
-            assert res_event["type"] == "approval:resolved"
-            assert res_event["approval_id"] == req_event["approval_id"]
-            assert res_event["approved"] is True
+        async def resolve_and_capture():
+            async for event in bus.subscribe(types={"approval:required"}):
+                gate.resolve_approval(event["approval_id"], approved=True)
+                break
+            # Give the fire-and-forget broadcast a moment
+            await asyncio.sleep(0.05)
+            events = bus.drain()
+            resolved = [e for e in events if e.get("type") == "approval:resolved"]
+            assert len(resolved) >= 1
+            assert resolved[0]["approved"] is True
 
-        task = asyncio.create_task(resolve_and_check())
+        task = asyncio.create_task(resolve_and_capture())
         await gate.request_approval(
             session_id=session.id,
             tool_name="TOOL",
@@ -186,11 +175,10 @@ class TestApprovalBroadcast:
         )
         await task
 
-    async def test_timeout_broadcasts_timeout_event(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+    async def test_timeout_emits_timeout_event(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()  # consume session:created
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=0.1)
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=0.1)
 
         await gate.request_approval(
             session_id=session.id,
@@ -199,66 +187,84 @@ class TestApprovalBroadcast:
             risk_level=RiskLevel.HIGH,
         )
 
-        # Should have broadcast approval:required then approval:timeout
-        events = []
-        while not broadcast.empty():
-            events.append(broadcast.get_nowait())
-        # At minimum, approval:required was broadcast
-        # approval:timeout should also have been broadcast
-        event_types = {e.get("type") if isinstance(e, dict) else None for e in events}
-        # The required event may already have been consumed; check timeout was emitted
-        # (This test is intentionally loose — exact ordering depends on implementation)
+        events = bus.drain()
+        event_types = [e["type"] for e in events]
+        assert "approval:timeout" in event_types
 
 
 # ---------------------------------------------------------------------------
-# resolve_approval
+# Approval request IDs
 # ---------------------------------------------------------------------------
 
 
-class TestResolveApproval:
-    async def test_resolve_nonexistent_approval_does_not_crash(self, manager: SessionManager):
+class TestApprovalIDs:
+    async def test_approval_id_has_prefix(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
+        session = await manager.create_main_session("task")
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=5)
+
+        async def capture_id():
+            async for event in bus.subscribe(types={"approval:required"}):
+                assert event["approval_id"].startswith("approval:")
+                gate.resolve_approval(event["approval_id"], approved=True)
+                break
+
+        task = asyncio.create_task(capture_id())
+        await gate.request_approval(
+            session_id=session.id, tool_name="TOOL", tool_args={}, risk_level=RiskLevel.HIGH,
+        )
+        await task
+
+    async def test_consecutive_requests_get_distinct_ids(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
+        session = await manager.create_main_session("task")
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=0.1)
+
+        await gate.request_approval(
+            session_id=session.id, tool_name="A", tool_args={}, risk_level=RiskLevel.HIGH,
+        )
+        await gate.request_approval(
+            session_id=session.id, tool_name="B", tool_args={}, risk_level=RiskLevel.HIGH,
+        )
+
+        events = bus.drain()
+        approval_ids = [
+            e["approval_id"] for e in events if e.get("type") == "approval:required"
+        ]
+        assert len(approval_ids) == 2
+        assert approval_ids[0] != approval_ids[1]
+
+
+# ---------------------------------------------------------------------------
+# resolve_approval edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestResolveEdgeCases:
+    async def test_resolve_unknown_id_does_not_crash(self, manager: SessionManager):
         gate = HITLGate(manager=manager, timeout_seconds=5)
-        # Should not raise
         gate.resolve_approval("approval:nonexistent", approved=True)
 
-    async def test_first_response_wins(self, manager_with_broadcast):
-        """If both dashboard and channel respond, only the first one counts."""
-        manager, broadcast = manager_with_broadcast
+    async def test_resolve_reason_surfaces_in_resolved_event(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=5)
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=5)
 
-        async def double_resolve():
-            event = await asyncio.wait_for(broadcast.get(), timeout=2)
-            approval_id = event["approval_id"]
-            # First: approve
-            gate.resolve_approval(approval_id, approved=True)
-            # Second: reject (should be ignored)
-            gate.resolve_approval(approval_id, approved=False)
+        async def reject_with_reason():
+            async for event in bus.subscribe(types={"approval:required"}):
+                gate.resolve_approval(
+                    event["approval_id"],
+                    approved=False,
+                    reason="Not authorized for payments",
+                )
+                break
+            await asyncio.sleep(0.05)
+            events = bus.drain()
+            resolved = [e for e in events if e.get("type") == "approval:resolved"]
+            assert len(resolved) >= 1
+            assert resolved[0].get("reason") == "Not authorized for payments"
 
-        task = asyncio.create_task(double_resolve())
-        approved = await gate.request_approval(
-            session_id=session.id,
-            tool_name="TOOL",
-            tool_args={},
-            risk_level=RiskLevel.HIGH,
-        )
-        await task
-
-        # First response was approve
-        assert approved is True
-
-    async def test_resolve_with_reason_stored(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
-        session = await manager.create_main_session("task")
-        await broadcast.get()
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=5)
-
-        async def resolve_with_reason():
-            event = await asyncio.wait_for(broadcast.get(), timeout=2)
-            gate.resolve_approval(event["approval_id"], approved=False, reason="Not authorized for payments")
-
-        task = asyncio.create_task(resolve_with_reason())
+        task = asyncio.create_task(reject_with_reason())
         await gate.request_approval(
             session_id=session.id,
             tool_name="STRIPE_CHARGE",
@@ -267,9 +273,6 @@ class TestResolveApproval:
         )
         await task
 
-        # The reason should be retrievable from the gate's stored approvals
-        # (exact API depends on implementation, but the data should be persisted)
-
 
 # ---------------------------------------------------------------------------
 # Channel delivery
@@ -277,38 +280,71 @@ class TestResolveApproval:
 
 
 class TestChannelDelivery:
-    async def test_sends_to_last_channel_when_available(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+    async def test_no_channel_does_not_prevent_broadcast(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=0.1)
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=5)
+
+        async def approve_via_bus():
+            async for event in bus.subscribe(types={"approval:required"}):
+                assert event["type"] == "approval:required"
+                gate.resolve_approval(event["approval_id"], approved=True)
+                break
+
+        task = asyncio.create_task(approve_via_bus())
+        result = await gate.request_approval(
+            session_id=session.id,
+            tool_name="TOOL",
+            tool_args={},
+            risk_level=RiskLevel.HIGH,
+        )
+        await task
+        assert result is True
+
+    async def test_channel_delivery_attempted_when_channel_set(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
+        session = await manager.create_main_session("task")
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=0.1)
 
         with patch.object(gate, "_send_channel_approval", new_callable=AsyncMock) as mock_send:
-            # Set up a last-known channel for this session
             gate.set_last_channel(session.id, channel="telegram", chat_id="12345")
-
             await gate.request_approval(
                 session_id=session.id,
                 tool_name="GMAIL_SEND",
-                tool_args={},
+                tool_args={"to": "alice@example.com"},
                 risk_level=RiskLevel.HIGH,
             )
 
         mock_send.assert_called_once()
-        call_kwargs = mock_send.call_args[1] if mock_send.call_args[1] else {}
-        call_args = mock_send.call_args[0] if mock_send.call_args[0] else ()
-        # Should reference the channel
-        all_args = str(call_args) + str(call_kwargs)
-        assert "telegram" in all_args or "12345" in all_args
 
-    async def test_no_channel_still_broadcasts_websocket(self, manager_with_broadcast):
-        """Even without a channel, the WebSocket broadcast must fire."""
-        manager, broadcast = manager_with_broadcast
+
+# ---------------------------------------------------------------------------
+# Timeout behaviour
+# ---------------------------------------------------------------------------
+
+
+class TestTimeoutBehaviour:
+    async def test_custom_timeout_respected(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=0.1)
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=0.05)
 
-        # No last_channel set — should still work
+        result = await asyncio.wait_for(
+            gate.request_approval(
+                session_id=session.id,
+                tool_name="TOOL",
+                tool_args={},
+                risk_level=RiskLevel.HIGH,
+            ),
+            timeout=2,
+        )
+        assert result is False
+
+    async def test_resolve_after_timeout_does_not_crash(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
+        session = await manager.create_main_session("task")
+        gate = HITLGate(manager=manager, event_bus=bus, timeout_seconds=0.05)
+
         await gate.request_approval(
             session_id=session.id,
             tool_name="TOOL",
@@ -316,52 +352,7 @@ class TestChannelDelivery:
             risk_level=RiskLevel.HIGH,
         )
 
-        # If we got here without exception, the gate handled missing channel gracefully
-
-
-# ---------------------------------------------------------------------------
-# Approval request IDs
-# ---------------------------------------------------------------------------
-
-
-class TestApprovalRequestIDs:
-    async def test_each_request_gets_unique_id(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
-        session = await manager.create_main_session("task")
-        await broadcast.get()
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=0.1)
-
-        # Fire two requests (both will timeout)
-        await gate.request_approval(
-            session_id=session.id, tool_name="A", tool_args={}, risk_level=RiskLevel.HIGH,
-        )
-        await gate.request_approval(
-            session_id=session.id, tool_name="B", tool_args={}, risk_level=RiskLevel.HIGH,
-        )
-
-        # Collect emitted approval_ids
-        ids = set()
-        while not broadcast.empty():
-            event = broadcast.get_nowait()
-            if isinstance(event, dict) and event.get("type") == "approval:required":
-                ids.add(event["approval_id"])
-
-        # At least the events were emitted — IDs should be distinct
-        # (exact count depends on whether timeout events also land here)
-
-    async def test_approval_id_starts_with_prefix(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
-        session = await manager.create_main_session("task")
-        await broadcast.get()
-        gate = HITLGate(manager=manager, broadcast_queue=broadcast, timeout_seconds=5)
-
-        async def capture_id():
-            event = await asyncio.wait_for(broadcast.get(), timeout=2)
-            assert event["approval_id"].startswith("approval:")
-            gate.resolve_approval(event["approval_id"], approved=True)
-
-        task = asyncio.create_task(capture_id())
-        await gate.request_approval(
-            session_id=session.id, tool_name="TOOL", tool_args={}, risk_level=RiskLevel.HIGH,
-        )
-        await task
+        events = bus.drain()
+        required = [e for e in events if e.get("type") == "approval:required"]
+        if required:
+            gate.resolve_approval(required[0]["approval_id"], approved=True)

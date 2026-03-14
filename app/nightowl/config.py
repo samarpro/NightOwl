@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""
 
+    # Redis
+    redis_url: str = "redis://localhost:6379"
+
     # Database
     database_url: str = "postgresql+asyncpg://localhost:5432/nightowl"
 

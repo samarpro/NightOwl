@@ -1,7 +1,7 @@
 """Composio meta-tools for Pydantic AI agents.
 
 composio_search_tools — discover available Composio tools by query.
-composio_execute — execute a Composio tool with risk classification and HITL gating.
+composio_execute — execute a Composio tool with HITL gating via decorator.
 """
 
 from __future__ import annotations
@@ -12,8 +12,7 @@ from typing import Any
 from pydantic_ai import RunContext
 
 from nightowl.config import settings
-from nightowl.hitl.classifier import verify_risk
-from nightowl.models.approval import RiskLevel
+from nightowl.hitl.decorator import hitl_gated
 from nightowl.sessions.tools import AgentState
 
 log = logging.getLogger(__name__)
@@ -48,21 +47,6 @@ def _get_composio_client() -> _ComposioClient:
     return _client_instance
 
 
-async def _request_approval(
-    session_id: str,
-    tool_name: str,
-    tool_args: dict[str, Any],
-    risk_level: RiskLevel,
-) -> bool:
-    """Request HITL approval. Placeholder — wired to HITLGate in the gateway."""
-    from nightowl.hitl.gate import HITLGate
-
-    # In production this gate instance is provided by the app lifespan.
-    # For now, this function exists as a seam the tests can patch.
-    log.warning("_request_approval called outside gateway context")
-    return False
-
-
 async def composio_search_tools(
     ctx: RunContext[AgentState],
     query: str,
@@ -79,52 +63,21 @@ async def composio_search_tools(
         return f"Error searching Composio tools: {exc}"
 
 
+@hitl_gated
 async def composio_execute(
     ctx: RunContext[AgentState],
     tool_name: str,
     params: dict[str, Any],
-    risk_level: str,
-    risk_justification: str,
+    risk_level: str = "low",
+    risk_justification: str = "",
 ) -> dict[str, Any] | str:
-    """Execute a Composio tool with risk classification and HITL gating.
+    """Execute a Composio tool.
 
-    Flow:
-    1. Parse risk_level string to RiskLevel enum
-    2. If risk >= MEDIUM, run Haiku classifier to verify
-    3. If verified risk >= MEDIUM, request HITL approval
-    4. If approved (or low risk), execute via Composio
-    5. If rejected, return denial message
+    Args:
+        tool_name: The Composio tool slug to execute.
+        params: Arguments to pass to the tool.
+        risk_level: Self-assessed risk — "low", "medium", "high", or "critical".
+        risk_justification: Why you chose this risk level.
     """
-    parsed_risk = RiskLevel(risk_level)
-    session_id = ctx.deps.session_id
-
-    # Step 1: Classify risk (skipped for LOW)
-    if parsed_risk != RiskLevel.LOW:
-        classification = await verify_risk(
-            tool_name=tool_name,
-            tool_args=params,
-            self_reported_risk=parsed_risk,
-            justification=risk_justification,
-        )
-        verified_risk = classification["verified_risk"]
-    else:
-        verified_risk = RiskLevel.LOW
-
-    # Step 2: HITL gate for MEDIUM+ verified risk
-    if verified_risk != RiskLevel.LOW:
-        approved = await _request_approval(
-            session_id=session_id,
-            tool_name=tool_name,
-            tool_args=params,
-            risk_level=verified_risk,
-        )
-        if not approved:
-            return f"Action denied — {tool_name} was rejected by the user."
-
-    # Step 3: Execute
-    try:
-        client = _get_composio_client()
-        return await client.execute_tool(tool_name, params=params)
-    except Exception as exc:
-        log.exception("Composio execution error")
-        return f"Error executing {tool_name}: {exc}"
+    client = _get_composio_client()
+    return await client.execute_tool(tool_name, params=params)
