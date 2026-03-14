@@ -19,8 +19,6 @@ RUN pip3 install --break-system-packages playwright \
 COPY playwright_bridge.py /usr/local/bin/playwright-bridge
 RUN chmod +x /usr/local/bin/playwright-bridge
 
-RUN useradd -m -s /bin/bash sandbox
-USER sandbox
-WORKDIR /home/sandbox
+WORKDIR /root
 
 CMD ["sleep", "infinity"]

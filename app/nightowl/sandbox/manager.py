@@ -154,3 +154,10 @@ class DockerSandboxManager:
     def get_container_for_session(self, session_id: str) -> str | None:
         """Look up the container ID for a session, or None."""
         return self._session_to_container.get(session_id)
+
+    async def cleanup_all(self) -> None:
+        """Stop and remove all tracked containers. Called on app shutdown."""
+        container_ids = list(self._container_to_session.keys())
+        for container_id in container_ids:
+            await self.cleanup(container_id)
+        log.info("Cleaned up %d sandbox container(s) on shutdown", len(container_ids))

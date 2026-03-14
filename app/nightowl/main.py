@@ -74,6 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    await manager.sandbox_manager.cleanup_all()
     await ingress_service.shutdown()
     await close_db()
 

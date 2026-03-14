@@ -26,9 +26,7 @@ RUN chmod +x /usr/local/bin/computer-use-bridge
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-RUN useradd -m -s /bin/bash sandbox
-USER sandbox
-WORKDIR /home/sandbox
+WORKDIR /root
 
 ENV DISPLAY=:99
 

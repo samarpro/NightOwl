@@ -106,6 +106,8 @@ class SessionManager:
         await self._emit(
             {"type": "session:spawned", "parent": parent_id, "child": child.model_dump()}
         )
+        if self.store:
+            await self.store.save_session(child)
         log.info("Spawned child %s (depth=%d, role=%s) from %s", session_id, child_depth, child_role, parent_id)
 
         # Kick off the child session as a background task
@@ -135,6 +137,15 @@ class SessionManager:
 
         session.state = SessionState.COMPLETED if success else SessionState.FAILED
         session.result = result
+
+        # Clean up sandbox container if one was created for this session
+        sandbox_mgr = getattr(self, "sandbox_manager", None)
+        if sandbox_mgr is not None:
+            container_id = sandbox_mgr.get_container_for_session(session_id)
+            if container_id is not None:
+                await sandbox_mgr.cleanup(container_id)
+                log.info("Cleaned up sandbox container %s for session %s", container_id, session_id)
+
         await self._emit(
             {"type": "session:completed", "session_id": session_id, "success": success}
         )
@@ -207,7 +218,12 @@ class SessionManager:
             return True
         return len(session.expected_completions) == 0
 
-    def cleanup_session(self, session_id: str) -> None:
+    async def cleanup_session(self, session_id: str) -> None:
+        sandbox_mgr = getattr(self, "sandbox_manager", None)
+        if sandbox_mgr is not None:
+            container_id = sandbox_mgr.get_container_for_session(session_id)
+            if container_id is not None:
+                await sandbox_mgr.cleanup(container_id)
         self._sessions.pop(session_id, None)
         self._queues.pop(session_id, None)
 
