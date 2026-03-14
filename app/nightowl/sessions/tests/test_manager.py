@@ -91,6 +91,20 @@ class TestMaxChildrenEnforcement:
             await manager.spawn_child(parent.id, SpawnRequest(task="one-too-many"))
 
 
+class TestIdleTimeout:
+    async def test_child_gets_default_idle_timeout(self, manager: SessionManager):
+        parent = await manager.create_main_session("parent")
+        child = await manager.spawn_child(parent.id, SpawnRequest(task="child"))
+        assert child.idle_timeout == 30
+
+    async def test_parent_can_set_child_idle_timeout(self, manager: SessionManager):
+        parent = await manager.create_main_session("parent")
+        child = await manager.spawn_child(
+            parent.id, SpawnRequest(task="long task", idle_timeout=300)
+        )
+        assert child.idle_timeout == 300
+
+
 class TestSandboxInheritance:
     async def test_sandboxed_parent_forces_sandboxed_child(self, manager: SessionManager):
         parent = await manager.create_main_session("parent")

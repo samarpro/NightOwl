@@ -32,6 +32,7 @@ async def sessions_spawn(
     label: str | None = None,
     sandbox: str | None = None,
     model: str | None = None,
+    idle_timeout: int | None = None,
 ) -> str:
     """Spawn a child agent session to work on a sub-task in parallel.
 
@@ -44,11 +45,14 @@ async def sessions_spawn(
         label: Short name for this child (shown in dashboard).
         sandbox: Sandbox mode — "none", "cli", "browser", or "computer".
         model: Optional model override for this child (e.g. "anthropic.claude-haiku-4-5-v1").
+        idle_timeout: Seconds the child stays alive waiting for follow-up messages
+            after completing its task. Default 30. Set higher for long-lived children
+            that need to handle multiple rounds of work.
     """
     try:
         manager = ctx.deps.manager
         sandbox_mode = SandboxMode(sandbox) if sandbox else SandboxMode.NONE
-        request = SpawnRequest(task=task, label=label, sandbox=sandbox_mode, model=model)
+        request = SpawnRequest(task=task, label=label, sandbox=sandbox_mode, model=model, idle_timeout=idle_timeout)
         child = await manager.spawn_child(ctx.deps.session_id, request)
         return (
             f"Spawned child session {child.id} (role={child.role}, depth={child.depth})."

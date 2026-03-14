@@ -34,6 +34,7 @@ class SpawnRequest(BaseModel):
     label: str | None = None
     sandbox: SandboxMode = SandboxMode.NONE
     model: str | None = None
+    idle_timeout: int | None = None
 
 
 class Session(BaseModel):
@@ -46,6 +47,7 @@ class Session(BaseModel):
     label: str | None = None
     sandbox_mode: SandboxMode | None = None
     model_override: str | None = None
+    idle_timeout: int = 30
     children: list[str] = Field(default_factory=list)
     expected_completions: set[str] = Field(default_factory=set)
     result: str | None = None

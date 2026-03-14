@@ -97,6 +97,7 @@ class SessionManager:
             label=request.label,
             sandbox_mode=sandbox,
             model_override=request.model,
+            idle_timeout=request.idle_timeout if request.idle_timeout is not None else 30,
         )
         self._sessions[session_id] = child
         self._queues[session_id] = asyncio.Queue()

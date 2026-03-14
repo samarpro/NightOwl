@@ -248,17 +248,14 @@ async def process_runtime_message(
     return output
 
 
-_CHILD_IDLE_TIMEOUT = 600  # 10 minutes idle before a child auto-exits
-
-
 async def run_child_session(session: Session, manager: SessionManager) -> None:
     """Entry point for background child sessions.
 
-    The child processes its initial task, then stays alive indefinitely to
-    handle messages from its parent and completions from its own children.
-    It only exits when:
+    The child processes its initial task, then stays alive to handle follow-up
+    messages from its parent and completions from its own children.
+    It exits when:
     - The parent sends a message containing [COMPLETE] to signal it's done
-    - It idles for _CHILD_IDLE_TIMEOUT seconds with no messages
+    - It idles for session.idle_timeout seconds with no messages
     """
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
@@ -281,9 +278,9 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
             session.state = SessionState.WAITING
             await manager._emit({"type": "session:waiting", "session_id": session.id, "session": session.model_dump()})
             try:
-                msg = await asyncio.wait_for(queue.get(), timeout=_CHILD_IDLE_TIMEOUT)
+                msg = await asyncio.wait_for(queue.get(), timeout=session.idle_timeout)
             except asyncio.TimeoutError:
-                log.info("Child session %s idle for %ds, completing", session.id, _CHILD_IDLE_TIMEOUT)
+                log.info("Child session %s idle for %ds, completing", session.id, session.idle_timeout)
                 break
             session.state = SessionState.RUNNING
             await manager._emit({"type": "session:running", "session_id": session.id, "session": session.model_dump()})
