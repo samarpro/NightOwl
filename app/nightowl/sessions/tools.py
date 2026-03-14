@@ -19,6 +19,7 @@ class AgentState:
     session_id: str
     manager: SessionManager
     hitl_gate: Any = None  # Optional HITLGate instance
+    channel_registry: Any = None  # Optional ChannelRegistry instance
     mcp_servers: list[Any] = field(default_factory=list)
 
 

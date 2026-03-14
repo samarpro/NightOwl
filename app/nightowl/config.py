@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     # Composio
     composio_api_key: str = ""
+    composio_user_id: str = "nightowl-default-user"
 
     # Channel tokens
     telegram_bot_token: str = ""
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
+    public_url: str = ""  # e.g. https://xyz.ngrok.io — needed for OAuth callbacks
 
 
 settings = Settings()

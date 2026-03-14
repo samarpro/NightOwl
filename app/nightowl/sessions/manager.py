@@ -29,6 +29,7 @@ class SessionManager:
         self._child_runner: Any | None = None  # async callable(Session, SessionManager)
         self._background_tasks: set[asyncio.Task[Any]] = set()
         self.hitl_gate: Any | None = None  # HITLGate instance, shared across all sessions
+        self.channel_registry: Any | None = None  # ChannelRegistry instance
 
     def set_child_runner(self, runner: Any) -> None:
         """Set the coroutine used to execute child sessions in the background."""

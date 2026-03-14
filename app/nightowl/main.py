@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -11,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from nightowl.api.routers.approvals import router as approvals_router
 from nightowl.api.routers.health import router as health_router
 from nightowl.api.routers.ingest import router as ingest_router
+from nightowl.api.routers.webhooks import router as webhooks_router
 from nightowl.api.routers.websocket import router as websocket_router
 from nightowl.channels.base import ChannelRegistry
 from nightowl.channels.telegram import TelegramBridge
@@ -25,6 +27,11 @@ from nightowl.sessions.runner import run_child_session
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s [%(levelname)s] %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("hpack").setLevel(logging.WARNING)
+
     session_factory = await init_db()
     broadcaster = RuntimeBroadcaster()
     manager = SessionManager()
@@ -37,6 +44,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     gate = HITLGate(manager=manager, event_bus=broadcaster, registry=registry)
     manager.hitl_gate = gate
+    manager.channel_registry = registry
 
     ingress_service = IngressService(manager=manager, registry=registry)
 
@@ -66,6 +74,7 @@ def create_app() -> FastAPI:
     application.include_router(health_router)
     application.include_router(ingest_router)
     application.include_router(approvals_router)
+    application.include_router(webhooks_router)
     application.include_router(websocket_router)
     return application
 

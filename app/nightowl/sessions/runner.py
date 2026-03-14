@@ -160,7 +160,7 @@ async def process_message(
 def create_session_runtime(session: Session, manager: SessionManager) -> SessionRuntime:
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
-    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate)
+    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry)
     return SessionRuntime(agent=agent, deps=deps)
 
 
@@ -185,7 +185,7 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
     """Entry point for background child sessions."""
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
-    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate)
+    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry)
     session.state = SessionState.RUNNING
     await manager._emit({"type": "session:running", "session_id": session.id})
 
@@ -219,7 +219,7 @@ async def run_interactive(
     session = await manager.create_main_session("interactive")
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
-    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate)
+    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry)
     session.state = SessionState.RUNNING
     message_history: list[Any] = []
 
