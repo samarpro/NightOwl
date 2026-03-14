@@ -25,20 +25,22 @@ class SessionManager:
     def __init__(self) -> None:
         self._sessions: dict[str, Session] = {}
         self._queues: dict[str, asyncio.Queue[Any]] = {}
-        self._broadcast: asyncio.Queue[dict[str, Any]] | None = None
+        self._event_bus: Any | None = None  # EventBus instance
         self._child_runner: Any | None = None  # async callable(Session, SessionManager)
         self._background_tasks: set[asyncio.Task[Any]] = set()
+        self.hitl_gate: Any | None = None  # HITLGate instance, shared across all sessions
 
     def set_child_runner(self, runner: Any) -> None:
         """Set the coroutine used to execute child sessions in the background."""
         self._child_runner = runner
 
-    def set_broadcast_queue(self, q: asyncio.Queue[dict[str, Any]]) -> None:
-        self._broadcast = q
+    def set_event_bus(self, bus: Any) -> None:
+        """Set the Redis event bus for publishing events."""
+        self._event_bus = bus
 
     async def _emit(self, event: dict[str, Any]) -> None:
-        if self._broadcast is not None:
-            await self._broadcast.put(event)
+        if self._event_bus is not None:
+            await self._event_bus.publish(event)
 
     # ── Session creation ──────────────────────────────────────────
 

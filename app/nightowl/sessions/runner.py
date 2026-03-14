@@ -1,9 +1,10 @@
-"""Session runner — executes a Pydantic AI agent session with the spawn/wait loop."""
+"""Session runner — executes Pydantic AI agents via iter() for full streaming visibility."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 import logfire
@@ -12,23 +13,26 @@ from pydantic_ai import Agent
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.bedrock import BedrockConverseModel
 from pydantic_ai.providers.bedrock import BedrockProvider
+from pydantic_graph import End
 
 from nightowl.config import settings
 
 logfire.configure(token=settings.logfire_token or None)
 logfire.instrument_pydantic_ai()
 
+from nightowl.composio_tools.meta_tools import composio_execute, composio_search_tools
 from nightowl.models.session import Session, SessionRole, SessionState
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.prompt_builder import build_system_prompt
-from nightowl.composio_tools.meta_tools import composio_execute, composio_search_tools
 from nightowl.sessions.tools import AgentState, sessions_list, sessions_send, sessions_spawn
 
 log = logging.getLogger(__name__)
 
+# Type alias for the event callback the caller provides
+EventCallback = Callable[[dict[str, Any]], Coroutine[Any, Any, None]]
+
 
 def _is_transient(exc: Exception) -> bool:
-    """Return True for errors worth retrying (rate limits, server errors)."""
     if isinstance(exc, ModelHTTPError):
         return exc.status_code in (429, 500, 502, 503, 504)
     return False
@@ -48,118 +52,155 @@ def _build_agent(session: Session, system_prompt: str) -> Agent[AgentState, str]
         retries=2,
     )
 
-    # Register session tools (leaf agents cannot spawn)
     if session.role != SessionRole.LEAF:
         agent.tool(sessions_spawn)
         agent.tool(sessions_list)
     agent.tool(sessions_send)
-
-    # Composio tools — available to all roles
     agent.tool(composio_search_tools)
     agent.tool(composio_execute)
 
     return agent
 
 
+async def _noop_event(_: dict[str, Any]) -> None:
+    pass
+
+
 @stamina.retry(on=_is_transient, attempts=5, wait_initial=1.0, wait_max=30.0, wait_jitter=2.0)
-async def _agent_run(
+async def _iter_agent(
     agent: Agent[AgentState, str],
     prompt: str,
     deps: AgentState,
-    message_history: list[Any] | None = None,
-) -> Any:
-    """Run an agent with exponential backoff on transient errors."""
+    message_history: list[Any] | None,
+    on_event: EventCallback,
+    interrupt: asyncio.Event | None = None,
+) -> tuple[str, list[Any]]:
+    """Run an agent via iter(), emitting node events. Supports interruption between nodes.
+
+    Returns (output, new_message_history).
+    """
     kwargs: dict[str, Any] = {"deps": deps}
     if message_history is not None:
         kwargs["message_history"] = message_history
-    return await agent.run(prompt, **kwargs)
+
+    async with agent.iter(prompt, **kwargs) as agent_run:
+        async for node in agent_run:
+            if Agent.is_model_request_node(node):
+                await on_event({"type": "node:model_request", "session_id": deps.session_id})
+            elif Agent.is_call_tools_node(node):
+                tool_parts = [
+                    p for p in node.model_response.parts
+                    if hasattr(p, "tool_name")
+                ]
+                await on_event({
+                    "type": "node:tool_call",
+                    "session_id": deps.session_id,
+                    "tools": [p.tool_name for p in tool_parts],
+                })
+            elif Agent.is_end_node(node):
+                await on_event({"type": "node:end", "session_id": deps.session_id})
+
+            # Check for interrupt between nodes
+            if interrupt and interrupt.is_set():
+                log.info("Session %s interrupted between nodes", deps.session_id)
+                break
+
+    output = agent_run.result.output if agent_run.result else ""
+    history = agent_run.result.all_messages() if agent_run.result else (message_history or [])
+    return output, history
+
+
+# ── Public API ────────────────────────────────────────────────────
+
+
+async def process_message(
+    session_id: str,
+    message: str,
+    manager: SessionManager,
+    agent: Agent[AgentState, str],
+    deps: AgentState,
+    message_history: list[Any],
+    on_event: EventCallback = _noop_event,
+    interrupt: asyncio.Event | None = None,
+) -> tuple[str, list[Any]]:
+    """Process a single message in a session. Core function for all entrypoints.
+
+    1. Drains pending child completions from the queue
+    2. Feeds them + the new message to the agent via iter()
+    3. Returns (output, updated_message_history)
+    """
+    # Drain pending child completions first — agent needs context
+    queue = manager.get_queue(session_id)
+    while queue and not queue.empty():
+        completion = queue.get_nowait()
+        await on_event({"type": "child_completion", "session_id": session_id})
+        _, message_history = await _iter_agent(
+            agent, completion, deps, message_history, on_event,
+        )
+
+    # Process the actual message
+    output, message_history = await _iter_agent(
+        agent, message, deps, message_history, on_event, interrupt,
+    )
+    return output, message_history
 
 
 async def run_child_session(session: Session, manager: SessionManager) -> None:
-    """Entry point for background child sessions. Uses the session's task as the initial message."""
-    await run_session(session, manager, session.task)
+    """Entry point for background child sessions."""
+    system_prompt = build_system_prompt(session)
+    agent = _build_agent(session, system_prompt)
+    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate)
+    session.state = SessionState.RUNNING
+    await manager._emit({"type": "session:running", "session_id": session.id})
+
+    output, _ = await _iter_agent(agent, session.task, deps, None, manager._emit)
+
+    # If children were spawned, wait for them
+    queue = manager.get_queue(session.id)
+    if queue and not manager.all_completions_received(session.id):
+        session.state = SessionState.WAITING
+        await manager._emit({"type": "session:waiting", "session_id": session.id})
+        history: list[Any] = []
+
+        while not manager.all_completions_received(session.id):
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=300)
+            except asyncio.TimeoutError:
+                log.warning("Child session %s timed out waiting for sub-children", session.id)
+                break
+            output, history = await _iter_agent(agent, msg, deps, history, manager._emit)
+
+    await manager.complete_session(session.id, output)
 
 
 async def run_interactive(
     manager: SessionManager,
-    get_input: Any,
-    put_output: Any,
+    get_input: Callable[[], Coroutine[Any, Any, str | None]],
+    put_output: Callable[[str], Coroutine[Any, Any, None]],
+    on_event: EventCallback = _noop_event,
 ) -> None:
-    """Multi-turn interactive loop. Non-blocking on child sessions.
-
-    Args:
-        manager: SessionManager (must already have child_runner and broadcast set).
-        get_input: async callable() -> str | None. Returns user input, or None to quit.
-        put_output: async callable(str) -> None. Sends agent output to the user.
-    """
+    """Multi-turn interactive loop. Thin wrapper around process_message."""
     session = await manager.create_main_session("interactive")
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
-    deps = AgentState(session_id=session.id, manager=manager)
+    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate)
     session.state = SessionState.RUNNING
     message_history: list[Any] = []
 
     while True:
-        # Drain pending child completions
-        queue = manager.get_queue(session.id)
-        while queue and not queue.empty():
-            message = queue.get_nowait()
-            result = await _agent_run(agent, message, deps, message_history)
-            message_history = result.new_messages()
-            await put_output(result.output)
-
         user_input = await get_input()
         if user_input is None:
             break
         if not user_input.strip():
             continue
 
-        # Drain again — completions may have arrived during input wait
-        while queue and not queue.empty():
-            message = queue.get_nowait()
-            result = await _agent_run(agent, message, deps, message_history)
-            message_history = result.new_messages()
-            await put_output(result.output)
+        try:
+            output, message_history = await process_message(
+                session.id, user_input, manager, agent, deps, message_history,
+                on_event=on_event,
+            )
+        except Exception as e:
+            await put_output(f"[error] {e}")
+            continue
 
-        result = await _agent_run(agent, user_input, deps, message_history)
-        message_history = result.new_messages()
-        await put_output(result.output)
-
-
-async def run_session(
-    session: Session,
-    manager: SessionManager,
-    initial_message: str,
-    skills_prompt: str | None = None,
-) -> str:
-    system_prompt = build_system_prompt(session, skills_prompt=skills_prompt)
-    agent = _build_agent(session, system_prompt)
-    deps = AgentState(session_id=session.id, manager=manager)
-
-    session.state = SessionState.RUNNING
-    await manager._emit({"type": "session:running", "session_id": session.id})
-
-    # Initial agent run
-    result = await _agent_run(agent, initial_message, deps)
-    response = result.output
-
-    # If children were spawned, enter wait loop
-    queue = manager.get_queue(session.id)
-    if queue and not manager.all_completions_received(session.id):
-        session.state = SessionState.WAITING
-        await manager._emit({"type": "session:waiting", "session_id": session.id})
-
-        while not manager.all_completions_received(session.id):
-            try:
-                message = await asyncio.wait_for(queue.get(), timeout=300)
-            except asyncio.TimeoutError:
-                log.warning("Session %s timed out waiting for children", session.id)
-                break
-
-            # Re-run agent with the completion message
-            result = await _agent_run(agent, message, deps, result.new_messages())
-            response = result.output
-
-    # Session done
-    await manager.complete_session(session.id, response)
-    return response
+        await put_output(output)

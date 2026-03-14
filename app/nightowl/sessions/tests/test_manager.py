@@ -190,26 +190,29 @@ class TestSendToSession:
 
 class TestBroadcastEvents:
     async def test_session_creation_emits_event(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+        manager, bus = manager_with_broadcast
         await manager.create_main_session("task")
-        event = await asyncio.wait_for(broadcast.get(), timeout=1)
+        event = bus.get_nowait()
+        assert event is not None
         assert event["type"] == "session:created"
 
     async def test_spawn_emits_event(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+        manager, bus = manager_with_broadcast
         parent = await manager.create_main_session("parent")
-        await broadcast.get()  # consume create event
+        bus.get_nowait()  # consume create event
         await manager.spawn_child(parent.id, SpawnRequest(task="child"))
-        event = await asyncio.wait_for(broadcast.get(), timeout=1)
+        event = bus.get_nowait()
+        assert event is not None
         assert event["type"] == "session:spawned"
         assert event["parent"] == parent.id
 
     async def test_completion_emits_event(self, manager_with_broadcast):
-        manager, broadcast = manager_with_broadcast
+        manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")
-        await broadcast.get()  # consume create event
+        bus.get_nowait()  # consume create event
         await manager.complete_session(session.id, "done")
-        event = await asyncio.wait_for(broadcast.get(), timeout=1)
+        event = bus.get_nowait()
+        assert event is not None
         assert event["type"] == "session:completed"
 
 

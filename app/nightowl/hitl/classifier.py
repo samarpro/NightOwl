@@ -16,7 +16,7 @@ from nightowl.models.approval import RiskLevel
 
 log = logging.getLogger(__name__)
 
-_HAIKU_MODEL = "au.anthropic.claude-haiku-4-5-v1"
+_HAIKU_MODEL = "au.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 _SYSTEM_PROMPT = """\
 You are a risk classifier for an AI assistant's tool calls.
@@ -79,15 +79,9 @@ async def verify_risk(
     """Verify the agent's self-reported risk level using Haiku.
 
     Returns {"verified_risk": RiskLevel, "reasoning": str}.
-    Only calls Haiku when self_reported_risk >= MEDIUM.
+    Called for LOW and MEDIUM risk to catch underreported danger.
+    HIGH/CRITICAL bypass the classifier entirely (handled by decorator).
     """
-    # Fast path: LOW risk skips the classifier
-    if self_reported_risk == RiskLevel.LOW:
-        return {
-            "verified_risk": RiskLevel.LOW,
-            "reasoning": "Low risk — skipped classifier",
-        }
-
     prompt = _build_prompt(
         tool_name, tool_args, self_reported_risk, justification, session_context
     )

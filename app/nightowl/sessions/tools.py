@@ -18,6 +18,7 @@ from nightowl.sessions.manager import SessionManager
 class AgentState:
     session_id: str
     manager: SessionManager
+    hitl_gate: Any = None  # Optional HITLGate instance
     mcp_servers: list[Any] = field(default_factory=list)
 
 
@@ -40,14 +41,17 @@ async def sessions_spawn(
         sandbox: Sandbox mode — "none", "cli", "browser", or "computer".
         model: Optional model override for this child (e.g. "anthropic.claude-haiku-4-5-v1").
     """
-    manager = ctx.deps.manager
-    sandbox_mode = SandboxMode(sandbox) if sandbox else SandboxMode.NONE
-    request = SpawnRequest(task=task, label=label, sandbox=sandbox_mode, model=model)
-    child = await manager.spawn_child(ctx.deps.session_id, request)
-    return (
-        f"Spawned child session {child.id} (role={child.role}, depth={child.depth})."
-        f" Wait for the completion event — do NOT poll."
-    )
+    try:
+        manager = ctx.deps.manager
+        sandbox_mode = SandboxMode(sandbox) if sandbox else SandboxMode.NONE
+        request = SpawnRequest(task=task, label=label, sandbox=sandbox_mode, model=model)
+        child = await manager.spawn_child(ctx.deps.session_id, request)
+        return (
+            f"Spawned child session {child.id} (role={child.role}, depth={child.depth})."
+            f" Wait for the completion event — do NOT poll."
+        )
+    except Exception as exc:
+        return f"Error spawning child session: {exc}"
 
 
 async def sessions_list(ctx: RunContext[AgentState]) -> list[dict[str, Any]]:

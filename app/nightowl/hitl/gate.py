@@ -23,11 +23,11 @@ class HITLGate:
     def __init__(
         self,
         manager: SessionManager,
-        broadcast_queue: asyncio.Queue[dict[str, Any]] | None = None,
+        event_bus: Any | None = None,
         timeout_seconds: float | None = None,
     ) -> None:
         self._manager = manager
-        self._broadcast = broadcast_queue
+        self._event_bus = event_bus
         self._timeout_seconds = (
             timeout_seconds if timeout_seconds is not None else settings.hitl_timeout_seconds
         )
@@ -41,8 +41,8 @@ class HITLGate:
         self._channels[session_id] = {"channel": channel, "chat_id": chat_id}
 
     async def _broadcast_event(self, event: dict[str, Any]) -> None:
-        if self._broadcast is not None:
-            await self._broadcast.put(event)
+        if self._event_bus is not None:
+            await self._event_bus.publish(event)
 
     async def _send_channel_approval(
         self,
