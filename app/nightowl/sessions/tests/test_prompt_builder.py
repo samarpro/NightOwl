@@ -51,7 +51,7 @@ class TestOrchestratorPrompt:
         prompt = build_system_prompt(
             _make_session(SessionRole.ORCHESTRATOR, depth=2, parent_id="session:parent")
         )
-        assert "2" in prompt
+        assert "depth" in prompt.lower() and "2" in prompt
         assert "orchestrator" in prompt.lower()
 
     def test_includes_parent_reference(self):
@@ -96,5 +96,5 @@ class TestLeafPrompt:
         prompt = build_system_prompt(
             _make_session(SessionRole.LEAF, depth=3, parent_id="session:parent")
         )
-        assert "3" in prompt
+        assert "depth" in prompt.lower() and "3" in prompt
         assert "leaf" in prompt.lower()

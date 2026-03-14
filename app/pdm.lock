@@ -5,7 +5,7 @@
 groups = ["default", "test"]
 strategy = []
 lock_version = "4.5.0"
-content_hash = "sha256:5a7c352788e3cea85fa995ac50a4433fe12cdb70dc3ee526ddb6d54000238deb"
+content_hash = "sha256:959859fd6ed26dfb310737322edf1dcdb29d4fe6f0c433cd110e37dc97ad68bb"
 
 [[metadata.targets]]
 requires_python = "==3.14.*"
@@ -92,6 +92,18 @@ files = [
     {file = "aiohttp-3.13.3-cp314-cp314t-win32.whl", hash = "sha256:2e41b18a58da1e474a057b3d35248d8320029f61d70a37629535b16a0c8f3767"},
     {file = "aiohttp-3.13.3-cp314-cp314t-win_amd64.whl", hash = "sha256:44531a36aa2264a1860089ffd4dce7baf875ee5a6079d5fb42e261c704ef7344"},
     {file = "aiohttp-3.13.3.tar.gz", hash = "sha256:a949eee43d3782f2daae4f4a2819b2cb9b0c5d3b7f7a927067cc84dafdbb9f88"},
+]
+
+[[package]]
+name = "aiohttp-retry"
+version = "2.9.1"
+summary = ""
+dependencies = [
+    "aiohttp",
+]
+files = [
+    {file = "aiohttp_retry-2.9.1-py3-none-any.whl", hash = "sha256:66d2759d1921838256a05a3f80ad7e724936f083e35be5abb5e16eed6be6dc54"},
+    {file = "aiohttp_retry-2.9.1.tar.gz", hash = "sha256:8eb75e904ed4ee5c2ec242fefe85bf04240f685391c4879d8f541d6028ff01f1"},
 ]
 
 [[package]]
@@ -2177,6 +2189,19 @@ files = [
 ]
 
 [[package]]
+name = "python-telegram-bot"
+version = "22.6"
+summary = ""
+dependencies = [
+    "httpcore",
+    "httpx",
+]
+files = [
+    {file = "python_telegram_bot-22.6-py3-none-any.whl", hash = "sha256:e598fe171c3dde2dfd0f001619ee9110eece66761a677b34719fb18934935ce0"},
+    {file = "python_telegram_bot-22.6.tar.gz", hash = "sha256:50ae8cc10f8dff01445628687951020721f37956966b92a91df4c1bf2d113742"},
+]
+
+[[package]]
 name = "pywin32"
 version = "311"
 summary = ""
@@ -2580,6 +2605,21 @@ dependencies = [
 files = [
     {file = "tqdm-4.67.3-py3-none-any.whl", hash = "sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf"},
     {file = "tqdm-4.67.3.tar.gz", hash = "sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb"},
+]
+
+[[package]]
+name = "twilio"
+version = "9.10.3"
+summary = ""
+dependencies = [
+    "aiohttp",
+    "aiohttp-retry",
+    "pyjwt",
+    "requests",
+]
+files = [
+    {file = "twilio-9.10.3-py2.py3-none-any.whl", hash = "sha256:b17a001dc0a57ef0c52d1e7ffa5e353f9b26e761fa151d11347aec530231345f"},
+    {file = "twilio-9.10.3.tar.gz", hash = "sha256:205df912bb56b4b905c89f1abf6684c6ebe0c2618dec6bfd49b247ba80f4f25d"},
 ]
 
 [[package]]
