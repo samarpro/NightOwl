@@ -21,7 +21,7 @@ async def _fake_process(runtime: _FakeRuntime, message: str, on_event):
     return f"echo:{message}"
 
 
-def _fake_runtime_factory(session, manager):
+def _fake_runtime_factory(session, manager, message_history=None):
     return _FakeRuntime(session.id)
 
 
@@ -90,6 +90,5 @@ class TestIngressService:
         await asyncio.sleep(0)
 
         assert first.session_id == second.session_id
-        event_types = [event["type"] for event in bus.drain()]
-        assert "session:resumed" in event_types
+        assert second.created is False
         await service.shutdown()

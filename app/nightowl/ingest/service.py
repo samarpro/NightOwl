@@ -35,7 +35,7 @@ class IngressService:
         self,
         manager: SessionManager,
         registry: ChannelRegistry,
-        runtime_factory: Callable[[Session, SessionManager], SessionRuntime] = create_session_runtime,
+        runtime_factory: Callable[..., SessionRuntime] = create_session_runtime,
         process_turn: Callable[
             [SessionRuntime, str, Callable[[dict[str, Any]], Awaitable[None]]],
             Awaitable[str],
@@ -46,10 +46,13 @@ class IngressService:
         self._runtime_factory = runtime_factory
         self._process_turn = process_turn
         self._workers: dict[str, _WorkerState] = {}
-        self._routes: dict[str, str] = {}  # route_key -> session_id
+        self._main_session_id: str | None = None
+        self._restored_history: list[Any] | None = None
 
-    def _route_key(self, message: ChannelMessage) -> str:
-        return f"{message.channel}:{message.sender_id}"
+    def set_resumed_session(self, session_id: str, message_history: list[Any]) -> None:
+        """Called on startup when a session is resumed from DB."""
+        self._main_session_id = session_id
+        self._restored_history = message_history
 
     async def ingest(self, message: ChannelMessage) -> IngestResult:
         session, created = await self._resolve_session(message)
@@ -59,6 +62,10 @@ class IngressService:
 
         if self._manager.hitl_gate is not None:
             self._manager.hitl_gate.set_last_channel(session.id, message.channel, chat_id)
+
+        # Persist channel route
+        if self._manager.store:
+            await self._manager.store.set_channel_route(session.id, message.sender_id)
 
         await self._manager._emit({
             "type": "channel:message_received",
@@ -83,23 +90,29 @@ class IngressService:
         self._workers.clear()
 
     async def _resolve_session(self, message: ChannelMessage) -> tuple[Session, bool]:
-        key = self._route_key(message)
-        session_id = self._routes.get(key)
-        if session_id:
-            session = self._manager.get_session(session_id)
+        # Check in-memory main session first
+        if self._main_session_id:
+            session = self._manager.get_session(self._main_session_id)
             if session and session.state not in {SessionState.COMPLETED, SessionState.FAILED}:
-                await self._manager._emit({
-                    "type": "session:resumed",
-                    "session_id": session.id,
-                    "channel": message.channel,
-                    "reason": "inbound_channel_message",
-                })
                 return session, False
-            if session:
-                self._registry.clear_session(session.id)
+            # Session ended — clear it
+            self._main_session_id = None
+            self._restored_history = None
 
+        # Try DB resume (first message after restart)
+        if self._manager.store:
+            result = await self._manager.load_and_resume()
+            if result:
+                session, messages = result
+                self._main_session_id = session.id
+                self._restored_history = messages
+                log.info("Resumed session %s from DB with %d messages", session.id, len(messages))
+                return session, False
+
+        # Create fresh session
         session = await self._manager.create_main_session(message.text, channel=message.channel)
-        self._routes[key] = session.id
+        self._main_session_id = session.id
+        self._restored_history = None
         return session, True
 
     def _ensure_worker(self, session: Session) -> None:
@@ -107,7 +120,11 @@ class IngressService:
         if current and not current.task.done():
             return
 
-        runtime = self._runtime_factory(session, self._manager)
+        # If we have restored history from DB, pass it to the runtime
+        history = self._restored_history
+        self._restored_history = None  # consumed
+
+        runtime = self._runtime_factory(session, self._manager, message_history=history)
         task = asyncio.create_task(self._session_worker(session, runtime), name=f"ingress:{session.id}")
         self._workers[session.id] = _WorkerState(runtime=runtime, task=task)
 

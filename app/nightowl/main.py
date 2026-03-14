@@ -23,6 +23,7 @@ from nightowl.hitl.gate import HITLGate
 from nightowl.ingest.service import IngressService
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.runner import run_child_session
+from nightowl.sessions.store import SessionStore
 
 
 @asynccontextmanager
@@ -33,10 +34,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logging.getLogger("hpack").setLevel(logging.WARNING)
 
     session_factory = await init_db()
+    store = SessionStore(session_factory)
     broadcaster = RuntimeBroadcaster()
     manager = SessionManager()
     manager.set_event_bus(broadcaster)
     manager.set_child_runner(run_child_session)
+    manager.store = store
 
     registry = ChannelRegistry()
     if settings.telegram_bot_token:
@@ -47,6 +50,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     manager.channel_registry = registry
 
     ingress_service = IngressService(manager=manager, registry=registry)
+
+    # Resume active session from DB if one exists
+    result = await manager.load_and_resume()
+    if result:
+        session, messages = result
+        ingress_service.set_resumed_session(session.id, messages)
 
     app.state.session_factory = session_factory
     app.state.broadcaster = broadcaster

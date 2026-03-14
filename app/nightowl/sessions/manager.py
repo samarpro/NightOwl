@@ -30,6 +30,7 @@ class SessionManager:
         self._background_tasks: set[asyncio.Task[Any]] = set()
         self.hitl_gate: Any | None = None  # HITLGate instance, shared across all sessions
         self.channel_registry: Any | None = None  # ChannelRegistry instance
+        self.store: Any | None = None  # SessionStore instance
 
     def set_child_runner(self, runner: Any) -> None:
         """Set the coroutine used to execute child sessions in the background."""
@@ -57,6 +58,8 @@ class SessionManager:
         self._sessions[session_id] = session
         self._queues[session_id] = asyncio.Queue()
         await self._emit({"type": "session:created", "session": session.model_dump(), "channel": channel})
+        if self.store:
+            await self.store.save_session(session)
         return session
 
     async def spawn_child(
@@ -135,6 +138,8 @@ class SessionManager:
         await self._emit(
             {"type": "session:completed", "session_id": session_id, "success": success}
         )
+        if self.store:
+            await self.store.update_session_state(session_id, session.state, result)
 
         if session.parent_id:
             await self.deliver_completion_to_parent(
@@ -197,3 +202,24 @@ class SessionManager:
     def cleanup_session(self, session_id: str) -> None:
         self._sessions.pop(session_id, None)
         self._queues.pop(session_id, None)
+
+    # ── Persistence ───────────────────────────────────────────────
+
+    async def load_and_resume(self) -> tuple[Any, list[Any]] | None:
+        """Load the active main session from DB on startup.
+
+        Returns (Session, message_history) or None.
+        """
+        if self.store is None:
+            return None
+        result = self.store.load_active_main_session()
+        if asyncio.iscoroutine(result):
+            result = await result
+        if result is None:
+            return None
+        session, messages = result
+        self._sessions[session.id] = session
+        self._queues[session.id] = asyncio.Queue()
+        await self.store.fail_orphaned_children()
+        log.info("Resumed session %s (%d messages)", session.id, len(messages))
+        return session, messages

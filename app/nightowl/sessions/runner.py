@@ -42,6 +42,7 @@ class SessionRuntime:
         self.agent = agent
         self.deps = deps
         self.message_history = message_history or []
+        self.persisted_count: int = len(self.message_history)  # already-persisted message count
 
 
 def _is_transient(exc: Exception) -> bool:
@@ -157,11 +158,17 @@ async def process_message(
     return output, message_history
 
 
-def create_session_runtime(session: Session, manager: SessionManager) -> SessionRuntime:
+def create_session_runtime(
+    session: Session, manager: SessionManager, message_history: list[Any] | None = None,
+) -> SessionRuntime:
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
-    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry)
-    return SessionRuntime(agent=agent, deps=deps)
+    deps = AgentState(
+        session_id=session.id, manager=manager,
+        hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry,
+        store=manager.store,
+    )
+    return SessionRuntime(agent=agent, deps=deps, message_history=message_history)
 
 
 async def process_runtime_message(
@@ -178,6 +185,12 @@ async def process_runtime_message(
         on_event,
         interrupt,
     )
+    # Persist new messages
+    store = runtime.deps.store
+    if store and len(runtime.message_history) > runtime.persisted_count:
+        new_msgs = runtime.message_history[runtime.persisted_count:]
+        await store.append_messages(runtime.deps.session_id, new_msgs, runtime.persisted_count)
+        runtime.persisted_count = len(runtime.message_history)
     return output
 
 
@@ -185,7 +198,7 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
     """Entry point for background child sessions."""
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
-    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry)
+    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry, store=manager.store)
     session.state = SessionState.RUNNING
     await manager._emit({"type": "session:running", "session_id": session.id})
 
@@ -219,7 +232,7 @@ async def run_interactive(
     session = await manager.create_main_session("interactive")
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
-    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry)
+    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry, store=manager.store)
     session.state = SessionState.RUNNING
     message_history: list[Any] = []
 

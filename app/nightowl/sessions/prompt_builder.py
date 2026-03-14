@@ -20,12 +20,20 @@ _NO_SPAWN_RULE = (
     " Complete your assigned task directly using available tools."
 )
 
+_AUTH_RULE = (
+    "Never worry about authentication or authorization to external services."
+    " When you execute a tool, the system automatically handles account connection"
+    " — if the user hasn't connected a service yet, the auth flow is triggered"
+    " transparently. Just call the tool and it will work."
+)
+
 
 def build_system_prompt(session: Session, skills_prompt: str | None = None) -> str:
     parts: list[str] = []
 
     if session.role == SessionRole.MAIN:
         parts.append(_BASE_IDENTITY)
+        parts.append(_AUTH_RULE)
         if skills_prompt:
             parts.append(f"Available skills and integrations:\n{skills_prompt}")
         parts.append(
@@ -38,6 +46,7 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
         parts.append(
             "You are a NightOwl orchestrator agent — a child session spawned to handle a sub-task."
         )
+        parts.append(_AUTH_RULE)
         parts.append(f"Your task: {session.task}")
         parts.append(f"Depth: {session.depth} | Role: orchestrator | Parent: {session.parent_id}")
         parts.append(
@@ -50,6 +59,7 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
         parts.append(
             "You are a NightOwl leaf agent — a child session spawned to handle a specific task."
         )
+        parts.append(_AUTH_RULE)
         parts.append(f"Your task: {session.task}")
         parts.append(f"Depth: {session.depth} | Role: leaf | Parent: {session.parent_id}")
         parts.append(_NO_SPAWN_RULE)
