@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: assistant-api
+Version: 0.1.0
+Summary: Default template for PDM package
+Author-email: Francois van Kempen & Sam Kanu <francois@francoisvankempen.com>
+License: MIT
+Requires-Python: ==3.14.*
+Description-Content-Type: text/markdown
+Requires-Dist: composio>=0.11.3
+Requires-Dist: pydantic-ai>=1.68.0
+Requires-Dist: fastmcp>=3.1.0
+Requires-Dist: fastapi>=0.135.1
+Requires-Dist: asyncpg>=0.31.0
+Requires-Dist: sqlalchemy>=2.0.48
+Requires-Dist: pydantic-settings>=2.13.1
