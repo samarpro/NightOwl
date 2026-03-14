@@ -1,48 +1,73 @@
-"""FastAPI application shell with lifespan context manager."""
+"""FastAPI application shell with routers and runtime services."""
 
 from __future__ import annotations
 
-import asyncio
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from nightowl.api.routers.approvals import router as approvals_router
+from nightowl.api.routers.health import router as health_router
+from nightowl.api.routers.ingest import router as ingest_router
+from nightowl.api.routers.websocket import router as websocket_router
+from nightowl.channels.base import ChannelRegistry
+from nightowl.channels.telegram import TelegramBridge
 from nightowl.config import settings
 from nightowl.db import close_db, init_db
+from nightowl.events import RuntimeBroadcaster
+from nightowl.hitl.gate import HITLGate
+from nightowl.ingest.service import IngressService
 from nightowl.sessions.manager import SessionManager
+from nightowl.sessions.runner import run_child_session
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[dict[str, Any]]:
-    # Startup
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     session_factory = await init_db()
+    broadcaster = RuntimeBroadcaster()
     manager = SessionManager()
-    broadcast: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-    manager.set_broadcast_queue(broadcast)
+    manager.set_event_bus(broadcaster)
+    manager.set_child_runner(run_child_session)
 
-    yield {
-        "session_factory": session_factory,
-        "manager": manager,
-        "broadcast": broadcast,
-    }
+    registry = ChannelRegistry()
+    if settings.telegram_bot_token:
+        registry.register(TelegramBridge())
 
-    # Shutdown
+    gate = HITLGate(manager=manager, event_bus=broadcaster, registry=registry)
+    manager.hitl_gate = gate
+
+    ingress_service = IngressService(manager=manager, registry=registry)
+
+    app.state.session_factory = session_factory
+    app.state.broadcaster = broadcaster
+    app.state.manager = manager
+    app.state.hitl_gate = gate
+    app.state.channel_registry = registry
+    app.state.ingress_service = ingress_service
+
+    yield
+
+    await ingress_service.shutdown()
     await close_db()
 
 
-app = FastAPI(title="NightOwl", version="0.1.0", lifespan=lifespan)
+def create_app() -> FastAPI:
+    application = FastAPI(title="NightOwl", version="0.1.0", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    application.include_router(health_router)
+    application.include_router(ingest_router)
+    application.include_router(approvals_router)
+    application.include_router(websocket_router)
+    return application
 
 
-@app.get("/api/v1/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+app = create_app()

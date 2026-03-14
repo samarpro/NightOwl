@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     # Channel tokens
     telegram_bot_token: str = ""
+    telegram_webhook_secret: str = ""
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""

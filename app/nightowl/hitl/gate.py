@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from nightowl.config import settings
@@ -25,9 +26,11 @@ class HITLGate:
         manager: SessionManager,
         event_bus: Any | None = None,
         timeout_seconds: float | None = None,
+        registry: Any | None = None,
     ) -> None:
         self._manager = manager
         self._event_bus = event_bus
+        self._registry = registry
         self._timeout_seconds = (
             timeout_seconds if timeout_seconds is not None else settings.hitl_timeout_seconds
         )
@@ -47,21 +50,28 @@ class HITLGate:
     async def _send_channel_approval(
         self,
         approval_id: str,
-        channel: str,
-        chat_id: str,
+        session_id: str,
         tool_name: str,
         tool_args: dict[str, Any],
         risk_level: RiskLevel,
     ) -> None:
-        """Send an approval request to the user's messaging channel.
-
-        This is a stub — actual Telegram/Twilio delivery will be wired in
-        the channel bridges epic.
-        """
-        log.info(
-            "Channel approval request %s -> %s:%s (tool=%s, risk=%s)",
-            approval_id, channel, chat_id, tool_name, risk_level,
+        if self._registry is None:
+            log.info("No channel registry configured for approval %s", approval_id)
+            return
+        channel_info = self._channels.get(session_id)
+        if not channel_info:
+            return
+        bridge = self._registry.get(channel_info["channel"])
+        if bridge is None:
+            return
+        approval = ApprovalRequest(
+            id=approval_id,
+            session_id=session_id,
+            tool_name=tool_name,
+            tool_args=tool_args,
+            risk_level=risk_level,
         )
+        await bridge.send_approval_request(channel_info["chat_id"], approval)
 
     async def request_approval(
         self,
@@ -78,7 +88,14 @@ class HITLGate:
         """
         approval_id = f"approval:{uuid.uuid4().hex[:12]}"
         event = asyncio.Event()
-        result: dict[str, Any] = {"approved": False, "reason": None}
+        expires_at = datetime.now(UTC) + timedelta(seconds=self._timeout_seconds)
+        channel_info = self._channels.get(session_id)
+        result: dict[str, Any] = {
+            "approved": False,
+            "reason": None,
+            "session_id": session_id,
+            "channel": channel_info["channel"] if channel_info else None,
+        }
         self._pending[approval_id] = (event, result)
 
         # Broadcast to dashboard via WebSocket
@@ -89,15 +106,15 @@ class HITLGate:
             "tool_name": tool_name,
             "tool_args": tool_args,
             "risk_level": risk_level,
+            "channel": channel_info["channel"] if channel_info else None,
+            "expires_at": expires_at.isoformat(),
         })
 
         # Send to user's last messaging channel if available
-        channel_info = self._channels.get(session_id)
         if channel_info:
             await self._send_channel_approval(
                 approval_id=approval_id,
-                channel=channel_info["channel"],
-                chat_id=channel_info["chat_id"],
+                session_id=session_id,
                 tool_name=tool_name,
                 tool_args=tool_args,
                 risk_level=risk_level,
@@ -112,6 +129,7 @@ class HITLGate:
                 "type": "approval:timeout",
                 "approval_id": approval_id,
                 "session_id": session_id,
+                "channel": channel_info["channel"] if channel_info else None,
             })
             self._pending.pop(approval_id, None)
             return False
@@ -145,6 +163,8 @@ class HITLGate:
         asyncio.ensure_future(self._broadcast_event({
             "type": "approval:resolved",
             "approval_id": approval_id,
+            "session_id": result.get("session_id"),
+            "channel": result.get("channel"),
             "approved": approved,
             "reason": reason,
         }))

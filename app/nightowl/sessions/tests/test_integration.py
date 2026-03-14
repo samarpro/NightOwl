@@ -13,6 +13,7 @@ import pytest
 from nightowl.config import settings
 from nightowl.models.session import SessionState, SpawnRequest
 from nightowl.sessions.manager import SessionManager
+from nightowl.sessions.runner import create_session_runtime, process_runtime_message
 
 needs_bedrock = pytest.mark.skipif(
     not settings.bedrock_api_key,
@@ -22,7 +23,6 @@ needs_bedrock = pytest.mark.skipif(
 
 def _get_runner():
     """Import the child-session runner by whatever name it currently has."""
-    # Isolates us from function renames inside runner.py.
     from nightowl.sessions import runner
 
     for name in ("run_child_session", "run_session"):
@@ -45,9 +45,7 @@ class TestBedrockEndToEnd:
         run = _get_runner()
         await run(child, manager)
 
-        # Child should be completed
         assert child.state == SessionState.COMPLETED
-        # Parent's queue should have the completion message
         q = manager.get_queue(parent.id)
         msg = await asyncio.wait_for(q.get(), timeout=5)
         assert isinstance(msg, str)
@@ -65,7 +63,23 @@ class TestBedrockEndToEnd:
         run = _get_runner()
         await run(child, manager)
 
-        # The completion delivered to parent should contain "4"
         q = manager.get_queue(parent.id)
         msg = await asyncio.wait_for(q.get(), timeout=5)
         assert "4" in msg
+
+
+@needs_bedrock
+class TestSessionRuntime:
+    async def test_runtime_responds_to_message(self):
+        manager = SessionManager()
+        session = await manager.create_main_session("Say hello")
+        runtime = create_session_runtime(session, manager)
+        response = await process_runtime_message(runtime, "Say hello in one sentence.")
+        assert len(response) > 0
+
+    async def test_runtime_response_is_coherent(self):
+        manager = SessionManager()
+        session = await manager.create_main_session("What is 2+2?")
+        runtime = create_session_runtime(session, manager)
+        response = await process_runtime_message(runtime, "What is 2+2? Reply with just the number.")
+        assert "4" in response

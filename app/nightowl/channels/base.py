@@ -28,11 +28,12 @@ class ChannelBridge(ABC):
 
 
 class ChannelRegistry:
-    """Registry of channel bridges with last-channel-per-user tracking."""
+    """Registry of channel bridges with last-channel-per-user and session routing."""
 
     def __init__(self) -> None:
         self._bridges: dict[str, ChannelBridge] = {}
         self._last_channel: dict[str, dict[str, str]] = {}
+        self._session_channels: dict[str, dict[str, str]] = {}
 
     def register(self, bridge: ChannelBridge) -> None:
         self._bridges[bridge.channel_id] = bridge
@@ -48,3 +49,25 @@ class ChannelRegistry:
 
     def get_last_channel(self, user_id: str) -> dict[str, str] | None:
         return self._last_channel.get(user_id)
+
+    # ── Session → channel routing ─────────────────────────────────
+
+    def set_session_channel(self, session_id: str, channel_id: str, chat_id: str) -> None:
+        """Map a session to the channel + chat_id it should reply to."""
+        self._session_channels[session_id] = {"channel": channel_id, "chat_id": chat_id}
+
+    def get_session_channel(self, session_id: str) -> dict[str, str] | None:
+        return self._session_channels.get(session_id)
+
+    async def send_session_reply(self, session_id: str, text: str) -> None:
+        """Send a text reply via the bridge associated with a session."""
+        info = self._session_channels.get(session_id)
+        if info is None:
+            return
+        bridge = self._bridges.get(info["channel"])
+        if bridge is None:
+            return
+        await bridge.send_message(info["chat_id"], text)
+
+    def clear_session(self, session_id: str) -> None:
+        self._session_channels.pop(session_id, None)

@@ -32,6 +32,18 @@ log = logging.getLogger(__name__)
 EventCallback = Callable[[dict[str, Any]], Coroutine[Any, Any, None]]
 
 
+class SessionRuntime:
+    def __init__(
+        self,
+        agent: Agent[AgentState, str],
+        deps: AgentState,
+        message_history: list[Any] | None = None,
+    ) -> None:
+        self.agent = agent
+        self.deps = deps
+        self.message_history = message_history or []
+
+
 def _is_transient(exc: Exception) -> bool:
     if isinstance(exc, ModelHTTPError):
         return exc.status_code in (429, 500, 502, 503, 504)
@@ -143,6 +155,30 @@ async def process_message(
         agent, message, deps, message_history, on_event, interrupt,
     )
     return output, message_history
+
+
+def create_session_runtime(session: Session, manager: SessionManager) -> SessionRuntime:
+    system_prompt = build_system_prompt(session)
+    agent = _build_agent(session, system_prompt)
+    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate)
+    return SessionRuntime(agent=agent, deps=deps)
+
+
+async def process_runtime_message(
+    runtime: SessionRuntime,
+    message: str,
+    on_event: EventCallback = _noop_event,
+    interrupt: asyncio.Event | None = None,
+) -> str:
+    output, runtime.message_history = await _iter_agent(
+        runtime.agent,
+        message,
+        runtime.deps,
+        runtime.message_history,
+        on_event,
+        interrupt,
+    )
+    return output
 
 
 async def run_child_session(session: Session, manager: SessionManager) -> None:

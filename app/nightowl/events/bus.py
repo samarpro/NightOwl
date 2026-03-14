@@ -1,24 +1,4 @@
-"""Redis pub/sub event bus.
-
-All system events (session lifecycle, approvals, node progress) flow through
-a single Redis channel. Any number of consumers can subscribe independently —
-no single-consumer contention like asyncio.Queue.
-
-Usage:
-    bus = EventBus(redis_url)
-    await bus.connect()
-
-    # Publish (from manager, gate, runner)
-    await bus.publish({"type": "session:created", ...})
-
-    # Subscribe (from CLI, dashboard WS, activity feed)
-    async for event in bus.subscribe():
-        handle(event)
-
-    # Subscribe with a filter
-    async for event in bus.subscribe(types={"approval:required"}):
-        handle_approval(event)
-"""
+"""Redis pub/sub event bus."""
 
 from __future__ import annotations
 
@@ -60,7 +40,6 @@ class EventBus:
     async def subscribe(
         self, types: set[str] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
-        """Yields events from the bus. Optionally filter by event type."""
         if self._redis is None:
             raise RuntimeError("EventBus not connected")
 
