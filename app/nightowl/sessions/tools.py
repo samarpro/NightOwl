@@ -113,3 +113,27 @@ async def sessions_send(
     await manager.send_to_session(session_id, prefix + message + "\n---")
     direction = "child" if is_child else "parent"
     return f"Message sent to {direction} {session_id}."
+
+
+async def sessions_complete(
+    ctx: RunContext[AgentState], session_id: str, reason: str = "",
+) -> str:
+    """Tell a child session to wrap up and complete.
+
+    The child will finish its current work and exit. Use this when
+    you're satisfied with the child's output and no longer need it.
+
+    Args:
+        session_id: The child session to complete.
+        reason: Optional reason for completion.
+    """
+    manager = ctx.deps.manager
+    target = manager.get_session(session_id)
+    if target is None:
+        return f"Session {session_id} not found."
+    if target.parent_id != ctx.deps.session_id:
+        return f"Session {session_id} is not your child."
+
+    result = reason or "Completed by parent"
+    await manager.complete_session(session_id, result)
+    return f"Child session {session_id} completed."

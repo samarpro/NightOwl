@@ -48,7 +48,9 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
             parts.append(f"Available skills and integrations:\n{skills_prompt}")
         parts.append(
             "You have session tools: sessions_spawn (spawn parallel child agents),"
-            " sessions_list (check child status), sessions_send (message a child or parent)."
+            " sessions_list (check child status), sessions_send (message a child or parent),"
+            " sessions_complete (tell a child to wrap up when you're done with it)."
+            " Children stay alive until you complete them or they idle out."
         )
         parts.append(_NO_POLL_RULE)
 
@@ -62,9 +64,10 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
         parts.append(f"Depth: {session.depth} | Role: orchestrator | Parent: {session.parent_id}")
         parts.append(
             "You can spawn further child sessions if needed."
-            " You have session tools: sessions_spawn, sessions_list, sessions_send."
-            " Use sessions_send to message your parent with questions, progress updates,"
-            " or partial results — you don't have to wait until completion to communicate."
+            " You have session tools: sessions_spawn, sessions_list, sessions_send,"
+            " sessions_complete. Use sessions_send to message your parent with questions,"
+            " progress updates, or partial results. Use sessions_complete to dismiss a"
+            " child when you're done with it. Children stay alive until you complete them."
         )
         parts.append(_NO_POLL_RULE)
 

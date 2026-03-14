@@ -11,9 +11,9 @@ import asyncio
 import pytest
 
 from nightowl.config import settings
-from nightowl.models.session import SessionState, SpawnRequest
+from nightowl.models.session import SpawnRequest
 from nightowl.sessions.manager import SessionManager
-from nightowl.sessions.runner import create_session_runtime, process_runtime_message
+from nightowl.sessions.runner import create_session_runtime, process_runtime_message, run_child_session
 
 needs_bedrock = pytest.mark.skipif(
     not settings.bedrock_api_key,
@@ -21,35 +21,31 @@ needs_bedrock = pytest.mark.skipif(
 )
 
 
-def _get_runner():
-    """Import the child-session runner by whatever name it currently has."""
-    from nightowl.sessions import runner
-
-    for name in ("run_child_session", "run_session"):
-        fn = getattr(runner, name, None)
-        if fn is not None:
-            return fn
-    raise ImportError("No child-session runner found in nightowl.sessions.runner")
-
-
 @needs_bedrock
 class TestBedrockEndToEnd:
-    async def test_child_completes_and_delivers_to_parent(self):
-        """Spawn a child, let Bedrock answer, verify the parent receives the result."""
+    async def test_child_delivers_to_parent(self):
+        """Spawn a child as a background task, verify the parent receives output."""
         manager = SessionManager()
         parent = await manager.create_main_session("parent")
         child = await manager.spawn_child(
             parent.id, SpawnRequest(task="Say hello in one sentence."),
         )
 
-        run = _get_runner()
-        await run(child, manager)
-
-        assert child.state == SessionState.COMPLETED
-        q = manager.get_queue(parent.id)
-        msg = await asyncio.wait_for(q.get(), timeout=5)
-        assert isinstance(msg, str)
-        assert len(msg) > 0
+        # Run child in background (it stays alive now)
+        task = asyncio.create_task(run_child_session(child, manager))
+        try:
+            q = manager.get_queue(parent.id)
+            msg = await asyncio.wait_for(q.get(), timeout=30)
+            assert isinstance(msg, str)
+            assert len(msg) > 0
+        finally:
+            # Complete the child so it exits
+            await manager.complete_session(child.id, "test done")
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     async def test_child_response_is_coherent(self):
         """Ask a factual question, verify the answer is in the result."""
@@ -60,12 +56,18 @@ class TestBedrockEndToEnd:
             SpawnRequest(task="What is 2+2? Reply with just the number."),
         )
 
-        run = _get_runner()
-        await run(child, manager)
-
-        q = manager.get_queue(parent.id)
-        msg = await asyncio.wait_for(q.get(), timeout=5)
-        assert "4" in msg
+        task = asyncio.create_task(run_child_session(child, manager))
+        try:
+            q = manager.get_queue(parent.id)
+            msg = await asyncio.wait_for(q.get(), timeout=30)
+            assert "4" in msg
+        finally:
+            await manager.complete_session(child.id, "test done")
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 @needs_bedrock

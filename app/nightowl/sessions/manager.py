@@ -142,6 +142,13 @@ class SessionManager:
             await self.store.update_session_state(session_id, session.state, result)
 
         if session.parent_id:
+            # Free the child slot on the parent so new children can be spawned
+            parent = self._sessions.get(session.parent_id)
+            if parent:
+                try:
+                    parent.children.remove(session_id)
+                except ValueError:
+                    pass
             await self.deliver_completion_to_parent(
                 TaskCompletionEvent(
                     child_session_id=session_id,

@@ -24,7 +24,7 @@ from nightowl.composio_tools.meta_tools import composio_execute, composio_search
 from nightowl.models.session import Session, SessionRole, SessionState
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.prompt_builder import build_system_prompt
-from nightowl.sessions.tools import AgentState, sessions_list, sessions_send, sessions_spawn
+from nightowl.sessions.tools import AgentState, sessions_complete, sessions_list, sessions_send, sessions_spawn
 
 log = logging.getLogger(__name__)
 
@@ -68,6 +68,7 @@ def _build_agent(session: Session, system_prompt: str) -> Agent[AgentState, str]
     if session.role != SessionRole.LEAF:
         agent.tool(sessions_spawn)
         agent.tool(sessions_list)
+        agent.tool(sessions_complete)
     agent.tool(sessions_send)
     agent.tool(composio_search_tools)
     agent.tool(composio_execute)
@@ -194,13 +195,17 @@ async def process_runtime_message(
     return output
 
 
+_CHILD_IDLE_TIMEOUT = 600  # 10 minutes idle before a child auto-exits
+
+
 async def run_child_session(session: Session, manager: SessionManager) -> None:
     """Entry point for background child sessions.
 
-    The child processes its initial task, then stays alive to handle:
-    - Completion events from its own children
-    - Messages from its parent (steering, questions, interrupts)
-    It only completes when all sub-children are done AND no more messages arrive.
+    The child processes its initial task, then stays alive indefinitely to
+    handle messages from its parent and completions from its own children.
+    It only exits when:
+    - The parent sends a message containing [COMPLETE] to signal it's done
+    - It idles for _CHILD_IDLE_TIMEOUT seconds with no messages
     """
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
@@ -210,17 +215,16 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
 
     output, history = await _iter_agent(agent, session.task, deps, None, manager._emit)
 
-    # Stay alive to process incoming messages (parent steering, child completions)
+    # Stay alive — persistent child session
     queue = manager.get_queue(session.id)
     if queue:
-        # Wait for messages while children are pending or queue has items
-        while not manager.all_completions_received(session.id) or not queue.empty():
+        while True:
             session.state = SessionState.WAITING
             await manager._emit({"type": "session:waiting", "session_id": session.id})
             try:
-                msg = await asyncio.wait_for(queue.get(), timeout=300)
+                msg = await asyncio.wait_for(queue.get(), timeout=_CHILD_IDLE_TIMEOUT)
             except asyncio.TimeoutError:
-                log.warning("Child session %s timed out waiting for messages", session.id)
+                log.info("Child session %s idle for %ds, completing", session.id, _CHILD_IDLE_TIMEOUT)
                 break
             session.state = SessionState.RUNNING
             await manager._emit({"type": "session:running", "session_id": session.id})
