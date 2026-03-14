@@ -408,6 +408,18 @@ class TestGateArguments:
         call_str = str(gate.request_approval.call_args)
         assert "critical" in call_str.lower()
 
+    async def test_gate_receives_justification_as_reason(self, manager: SessionManager):
+        gate = MagicMock(
+            request_approval=AsyncMock(return_value=ApprovalResult(decision=ApprovalDecision.APPROVE)),
+        )
+        ctx = await _make_ctx_with_gate(manager, gate=gate)
+
+        await _dummy_tool(ctx, risk_level="high", risk_justification="sending email to external recipient")
+
+        gate.request_approval.assert_called_once()
+        call_kwargs = gate.request_approval.call_args
+        assert call_kwargs.kwargs.get("reason") == "sending email to external recipient"
+
 
 # ---------------------------------------------------------------------------
 # No gate configured: must deny by default (fail-closed)

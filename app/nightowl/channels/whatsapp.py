@@ -64,9 +64,11 @@ class WhatsAppBridge(ChannelBridge):
         )
 
     async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> dict[str, str] | None:
+        reason_line = f"Why: {approval.reason}\n" if approval.reason else ""
         text = (
             f"Approval Required [{approval.risk_level.value.upper()}]\n\n"
             f"Tool: {approval.tool_name}\n"
+            f"{reason_line}"
             f"Args: {json.dumps(approval.tool_args)}\n"
             f"Session: {approval.session_id}\n"
             f"ID: {approval.id}\n\n"

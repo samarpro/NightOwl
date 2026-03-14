@@ -33,6 +33,7 @@ class ApprovalRequest(BaseModel):
     tool_name: str
     tool_args: dict[str, Any] = {}
     risk_level: RiskLevel
+    reason: str = ""
     status: str = "pending"
 
 

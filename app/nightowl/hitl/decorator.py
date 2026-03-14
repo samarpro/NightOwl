@@ -82,6 +82,7 @@ def hitl_gated(fn: Any) -> Any:
                 tool_name=fn.__name__,
                 tool_args={k: v for k, v in kwargs.items()},
                 risk_level=verified_risk,
+                reason=justification,
             )
             if approval_result.decision == ApprovalDecision.REJECT:
                 reason_suffix = (

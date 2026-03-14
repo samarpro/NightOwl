@@ -16,6 +16,7 @@ class ApprovalRow(Base):
     tool_name: Mapped[str] = mapped_column(String, nullable=False)
     tool_args: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     risk_level: Mapped[str] = mapped_column(String, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
     status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

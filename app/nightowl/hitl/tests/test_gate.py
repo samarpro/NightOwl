@@ -166,6 +166,27 @@ class TestBroadcastEvents:
         )
         await task
 
+    async def test_approval_required_event_includes_reason(self, manager_with_broadcast):
+        manager, bus = manager_with_broadcast
+        session = await manager.create_main_session("task")
+        gate = HITLGate(manager=manager, event_bus=bus)
+
+        async def capture_and_resolve():
+            async for event in bus.subscribe(types={"approval:required"}):
+                assert event.get("reason") == "need to send email to external address"
+                gate.resolve_approval(event["approval_id"], decision=ApprovalDecision.APPROVE)
+                break
+
+        task = asyncio.create_task(capture_and_resolve())
+        await gate.request_approval(
+            session_id=session.id,
+            tool_name="GMAIL_SEND",
+            tool_args={"to": "bob@example.com"},
+            risk_level=RiskLevel.HIGH,
+            reason="need to send email to external address",
+        )
+        await task
+
     async def test_resolved_event_emitted_on_approve(self, manager_with_broadcast):
         manager, bus = manager_with_broadcast
         session = await manager.create_main_session("task")

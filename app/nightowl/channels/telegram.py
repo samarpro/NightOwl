@@ -60,10 +60,12 @@ class TelegramBridge(ChannelBridge):
 
     async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> dict[str, str] | None:
         args_str = json.dumps(approval.tool_args, indent=2)
+        reason_line = f"\n<b>Why:</b> {approval.reason}" if approval.reason else ""
         text = (
             f"🔒 <b>Approval Required</b> [{approval.risk_level.value.upper()}]\n\n"
             f"<b>Tool:</b> <code>{approval.tool_name}</code>\n"
             f"<b>Args:</b>\n<pre>{args_str}</pre>"
+            f"{reason_line}"
         )
         keyboard = InlineKeyboardMarkup([
             [

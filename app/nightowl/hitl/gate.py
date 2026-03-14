@@ -71,6 +71,7 @@ class HITLGate:
         tool_name: str,
         tool_args: dict[str, Any],
         risk_level: RiskLevel,
+        reason: str = "",
     ) -> dict[str, str] | None:
         if self._registry is None:
             log.info("No channel registry configured for approval %s", approval_id)
@@ -87,6 +88,7 @@ class HITLGate:
             tool_name=tool_name,
             tool_args=tool_args,
             risk_level=risk_level,
+            reason=reason,
         )
         return await bridge.send_approval_request(channel_info["chat_id"], approval)
 
@@ -120,6 +122,7 @@ class HITLGate:
         tool_name: str,
         tool_args: dict[str, Any],
         risk_level: RiskLevel,
+        reason: str = "",
     ) -> ApprovalResult:
         """Request human approval for a tool call.
 
@@ -148,6 +151,7 @@ class HITLGate:
             "tool_name": tool_name,
             "tool_args": tool_args,
             "risk_level": risk_level,
+            "reason": reason,
             "channel": channel_info["channel"] if channel_info else None,
         })
 
@@ -159,6 +163,7 @@ class HITLGate:
                 tool_name=tool_name,
                 tool_args=tool_args,
                 risk_level=risk_level,
+                reason=reason,
             )
             if channel_message_ref:
                 result["approval_message_ref"] = channel_message_ref

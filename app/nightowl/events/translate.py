@@ -157,7 +157,7 @@ def translate_runtime_event(raw: dict[str, Any]) -> RuntimeEvent | None:
                 "sessionId": raw.get("session_id"),
                 "title": f"Approve {raw.get('tool_name', 'tool')}",
                 "toolName": raw.get("tool_name"),
-                "justification": raw.get("justification", ""),
+                "reason": raw.get("reason", ""),
                 "riskLevel": str(raw.get("risk_level", "medium")),
                 "expiresAt": raw.get("expires_at"),
                 "status": "pending",
