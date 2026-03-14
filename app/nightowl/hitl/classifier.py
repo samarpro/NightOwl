@@ -31,6 +31,16 @@ Risk levels (low → critical):
 - high: external communication, financial reads, irreversible writes
 - critical: financial transactions, bulk deletes, account-level changes
 
+IMPORTANT CONTEXT — sandbox tools:
+Tools prefixed with "sandbox_", "bash_exec", "browser_", and "computer_use_" \
+run inside ephemeral Docker containers that are destroyed after the session. \
+They have NO access to the host filesystem, host network, or user credentials \
+beyond what was explicitly injected. Running scripts, installing packages, \
+writing files, or navigating websites inside these containers is inherently \
+LOW risk. Only classify sandbox tool calls as medium+ if they explicitly \
+perform external communication with real services (e.g. sending emails, \
+posting to APIs with real credentials, making purchases).
+
 Respond with ONLY a JSON object:
 {"verified_risk": "<low|medium|high|critical>", "reasoning": "<one sentence>"}
 """
