@@ -75,12 +75,29 @@ async def sessions_list(ctx: RunContext[AgentState]) -> list[dict[str, Any]]:
 async def sessions_send(
     ctx: RunContext[AgentState], session_id: str, message: str
 ) -> str:
-    """Send a steering message to a running child session."""
+    """Send a message to another session — a child, or your parent.
+
+    Use this to steer a running child, ask your parent for clarification,
+    or send progress updates. The target must be your child or your parent.
+
+    Args:
+        session_id: The session to send to.
+        message: The message content.
+    """
     manager = ctx.deps.manager
-    child = manager.get_session(session_id)
-    if child is None:
+    me = manager.get_session(ctx.deps.session_id)
+    target = manager.get_session(session_id)
+    if target is None:
         return f"Session {session_id} not found."
-    if child.parent_id != ctx.deps.session_id:
-        return f"Session {session_id} is not your child."
-    await manager.send_to_session(session_id, message)
-    return f"Message sent to {session_id}."
+
+    # Allow sending to children or parent
+    is_child = target.parent_id == ctx.deps.session_id
+    is_parent = me is not None and me.parent_id == session_id
+    if not is_child and not is_parent:
+        return f"Session {session_id} is not your child or parent."
+
+    direction = "child" if is_child else "parent"
+    label = me.label or ctx.deps.session_id if me else ctx.deps.session_id
+    prefix = f"[MESSAGE FROM {direction.upper()} — {label}]\n"
+    await manager.send_to_session(session_id, prefix + message)
+    return f"Message sent to {direction} {session_id}."

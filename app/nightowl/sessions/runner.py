@@ -195,28 +195,35 @@ async def process_runtime_message(
 
 
 async def run_child_session(session: Session, manager: SessionManager) -> None:
-    """Entry point for background child sessions."""
+    """Entry point for background child sessions.
+
+    The child processes its initial task, then stays alive to handle:
+    - Completion events from its own children
+    - Messages from its parent (steering, questions, interrupts)
+    It only completes when all sub-children are done AND no more messages arrive.
+    """
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
     deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry, store=manager.store)
     session.state = SessionState.RUNNING
     await manager._emit({"type": "session:running", "session_id": session.id})
 
-    output, _ = await _iter_agent(agent, session.task, deps, None, manager._emit)
+    output, history = await _iter_agent(agent, session.task, deps, None, manager._emit)
 
-    # If children were spawned, wait for them
+    # Stay alive to process incoming messages (parent steering, child completions)
     queue = manager.get_queue(session.id)
-    if queue and not manager.all_completions_received(session.id):
-        session.state = SessionState.WAITING
-        await manager._emit({"type": "session:waiting", "session_id": session.id})
-        history: list[Any] = []
-
-        while not manager.all_completions_received(session.id):
+    if queue:
+        # Wait for messages while children are pending or queue has items
+        while not manager.all_completions_received(session.id) or not queue.empty():
+            session.state = SessionState.WAITING
+            await manager._emit({"type": "session:waiting", "session_id": session.id})
             try:
                 msg = await asyncio.wait_for(queue.get(), timeout=300)
             except asyncio.TimeoutError:
-                log.warning("Child session %s timed out waiting for sub-children", session.id)
+                log.warning("Child session %s timed out waiting for messages", session.id)
                 break
+            session.state = SessionState.RUNNING
+            await manager._emit({"type": "session:running", "session_id": session.id})
             output, history = await _iter_agent(agent, msg, deps, history, manager._emit)
 
     await manager.complete_session(session.id, output)

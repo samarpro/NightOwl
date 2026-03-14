@@ -38,7 +38,7 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
             parts.append(f"Available skills and integrations:\n{skills_prompt}")
         parts.append(
             "You have session tools: sessions_spawn (spawn parallel child agents),"
-            " sessions_list (check child status), sessions_send (steer a child)."
+            " sessions_list (check child status), sessions_send (message a child or parent)."
         )
         parts.append(_NO_POLL_RULE)
 
@@ -52,6 +52,8 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
         parts.append(
             "You can spawn further child sessions if needed."
             " You have session tools: sessions_spawn, sessions_list, sessions_send."
+            " Use sessions_send to message your parent with questions, progress updates,"
+            " or partial results — you don't have to wait until completion to communicate."
         )
         parts.append(_NO_POLL_RULE)
 
@@ -63,5 +65,9 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
         parts.append(f"Your task: {session.task}")
         parts.append(f"Depth: {session.depth} | Role: leaf | Parent: {session.parent_id}")
         parts.append(_NO_SPAWN_RULE)
+        parts.append(
+            "You can message your parent with sessions_send if you need clarification,"
+            " want to report progress, or have partial results to share."
+        )
 
     return "\n\n".join(parts)

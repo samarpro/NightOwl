@@ -104,4 +104,4 @@ class TestSessionsSend:
 
         q = manager.get_queue(child.id)
         msg = await asyncio.wait_for(q.get(), timeout=1)
-        assert msg == "change direction"
+        assert "change direction" in msg
