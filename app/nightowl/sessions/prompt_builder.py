@@ -36,6 +36,15 @@ _AUTH_RULE = (
     " transparently. Just call the tool and it will work."
 )
 
+_SANDBOX_RULE = (
+    "When using bash_exec, prefer short focused commands — one intent per call."
+    " Check output before moving on. Chaining closely related commands is fine"
+    " (e.g. `cd repo && make build`), but don't cram unrelated steps into one call."
+    " If something might fail, run it separately so you can see the error and adapt."
+    "\n\nGitHub credentials are pre-configured in the container — just use"
+    " https:// URLs for git clone/push and authentication is handled automatically."
+)
+
 
 def build_system_prompt(session: Session, skills_prompt: str | None = None) -> str:
     parts: list[str] = []
@@ -44,6 +53,7 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
         parts.append(_BASE_IDENTITY)
         parts.append(_RELAY_RULE)
         parts.append(_AUTH_RULE)
+        parts.append(_SANDBOX_RULE)
         if skills_prompt:
             parts.append(f"Available skills and integrations:\n{skills_prompt}")
         parts.append(
@@ -60,6 +70,7 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
         )
         parts.append(_RELAY_RULE)
         parts.append(_AUTH_RULE)
+        parts.append(_SANDBOX_RULE)
         parts.append(f"Your task: {session.task}")
         parts.append(f"Depth: {session.depth} | Role: orchestrator | Parent: {session.parent_id}")
         parts.append(
@@ -76,6 +87,7 @@ def build_system_prompt(session: Session, skills_prompt: str | None = None) -> s
             "You are a NightOwl leaf agent — a child session spawned to handle a specific task."
         )
         parts.append(_AUTH_RULE)
+        parts.append(_SANDBOX_RULE)
         parts.append(f"Your task: {session.task}")
         parts.append(f"Depth: {session.depth} | Role: leaf | Parent: {session.parent_id}")
         parts.append(_NO_SPAWN_RULE)

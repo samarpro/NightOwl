@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 
 import docker
 
@@ -42,6 +43,44 @@ class ExecResult:
     exit_code: int
 
 
+def _fetch_composio_credentials() -> dict[str, str]:
+    """Fetch auth tokens from Composio for active connected accounts.
+
+    Returns env vars to inject into containers, e.g. {"GITHUB_TOKEN": "gho_..."}.
+    Fails silently — missing credentials just mean the container has no auth.
+    """
+    env: dict[str, str] = {}
+    try:
+        from composio import Composio
+        from nightowl.config import settings
+
+        if not settings.composio_api_key:
+            return env
+
+        sdk = Composio(api_key=settings.composio_api_key)
+        accounts = sdk.connected_accounts.list(
+            toolkit_slugs=["github"],
+            user_ids=[settings.composio_user_id],
+            statuses=["ACTIVE"],
+        )
+        if accounts.items:
+            full = sdk.connected_accounts.get(accounts.items[0].id)
+            token = (full.params or {}).get("access_token")
+            if token:
+                env["GITHUB_TOKEN"] = str(token)
+                log.info("Injecting GitHub credentials into sandbox container")
+    except Exception:
+        log.debug("Could not fetch Composio credentials for sandbox", exc_info=True)
+    return env
+
+
+_GIT_CREDENTIAL_SETUP = (
+    'git config --global credential.helper '
+    "'!f() { echo \"protocol=https\"; echo \"host=github.com\"; "
+    "echo \"username=x-access-token\"; echo \"password=$GITHUB_TOKEN\"; }; f'"
+)
+
+
 class DockerSandboxManager:
     """Manages ephemeral Docker containers for sandboxed agent sessions."""
 
@@ -54,6 +93,9 @@ class DockerSandboxManager:
     ) -> str:
         """Create and start a sandboxed container for the given session.
 
+        Injects Composio credentials (e.g. GitHub token) as env vars and
+        configures git credential helper automatically.
+
         Returns the container ID.
         """
         if sandbox_mode == SandboxMode.NONE:
@@ -61,6 +103,9 @@ class DockerSandboxManager:
 
         image = _IMAGES[sandbox_mode]
         client = _get_docker_client()
+
+        # Fetch credentials to inject — agent never sees these
+        cred_env = await asyncio.to_thread(_fetch_composio_credentials)
 
         container = await asyncio.to_thread(
             client.containers.run,
@@ -71,6 +116,7 @@ class DockerSandboxManager:
             mem_limit=_DEFAULT_MEM_LIMIT,
             cpu_period=_DEFAULT_CPU_PERIOD,
             cpu_quota=_DEFAULT_CPU_QUOTA,
+            environment=cred_env,
             volumes={},
             labels={"nightowl.session_id": session_id},
         )
@@ -79,6 +125,11 @@ class DockerSandboxManager:
         self._session_to_container[session_id] = container_id
         self._container_to_session[container_id] = session_id
         log.info("Created %s container %s for session %s", sandbox_mode, container_id, session_id)
+
+        # Configure git credential helper if we injected a GitHub token
+        if "GITHUB_TOKEN" in cred_env:
+            await self.exec_command(container_id, _GIT_CREDENTIAL_SETUP)
+
         return container_id
 
     async def exec_command(self, container_id: str, command: str) -> ExecResult:
