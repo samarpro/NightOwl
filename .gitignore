@@ -25,3 +25,9 @@ build/
 *.dylib
 *.exe
 *.o
+node_modules/
+dist/
+build/
+*.log
+*.tmp
+*.bak
