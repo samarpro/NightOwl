@@ -35,43 +35,25 @@ function SessionTreeItem({ session, selectedSessionId, onSelectSession }: Sessio
         className="session-card"
         data-selected={selectedSessionId === session.id}
         onClick={() => onSelectSession(session.id)}
+        title={session.label}
         type="button"
       >
         <div className="session-card__row">
-          <div className="session-card__title">
-            <strong>{session.label}</strong>
-            <span>{session.taskSummary}</span>
-          </div>
+          <span className="session-card__goal">{session.taskSummary}</span>
           <span
             className={cn(
               "badge",
               session.status === "running" && "badge--running",
               session.status === "waiting" && "badge--waiting",
               session.status === "blocked" && "badge--blocked",
+              session.status === "completed" && "badge--completed",
             )}
           >
             {session.status}
           </span>
         </div>
-        <div className="detail-row">
-          <span className="muted">
-            {session.role} via {session.channel}
-          </span>
-          <span className="muted">{session.currentIntent}</span>
-        </div>
       </button>
-      {session.children.length > 0 ? (
-        <div className="session-card__children">
-          {session.children.map((child) => (
-            <SessionTreeItem
-              key={child.id}
-              onSelectSession={onSelectSession}
-              selectedSessionId={selectedSessionId}
-              session={child}
-            />
-          ))}
-        </div>
-      ) : null}
+      
     </div>
   );
 }

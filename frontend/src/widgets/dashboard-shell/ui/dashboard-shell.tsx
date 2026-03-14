@@ -1,14 +1,12 @@
 import { buildSessionTree } from "entities/session/model/selectors";
 import { useSelectionStore } from "features/session-controls/model/selection-store";
 import { useDashboardData } from "features/dashboard/model/use-dashboard-data";
+import { SessionCanvas } from "features/session-canvas/ui/session-canvas";
 import { SessionTree } from "widgets/dashboard-shell/ui/session-tree";
-import { IntentList } from "features/intention-graph/ui/intent-list";
-import { ApprovalList } from "features/approvals/ui/approval-list";
-import { TokenViewer } from "features/token-viewer/ui/token-viewer";
 
 export function DashboardShell() {
   const { data, isLoading } = useDashboardData();
-  const { selectedIntentId, selectedSessionId, selectIntent, selectSession } = useSelectionStore();
+  const { selectedSessionId, selectSession } = useSelectionStore();
 
   if (isLoading || !data) {
     return <div className="app-shell">Loading dashboard…</div>;
@@ -16,9 +14,6 @@ export function DashboardShell() {
 
   const tree = buildSessionTree(data.sessions);
   const activeSession = data.sessions.find((session) => session.id === selectedSessionId) ?? data.sessions[0];
-  const visibleIntents = data.intents.filter((intent) => intent.sessionId === activeSession?.id);
-  const activeIntent = data.intents.find((intent) => intent.id === selectedIntentId) ?? visibleIntents[0];
-  const visibleTokens = data.tokens.filter((token) => token.intentId === activeIntent?.id);
 
   return (
     <div className="app-shell">
@@ -41,11 +36,11 @@ export function DashboardShell() {
         </header>
 
         <div className="dashboard-grid">
-          <section className="panel">
+          <section className="panel panel--session-rail">
             <div className="panel__header">
               <div>
                 <h2>Session Tree</h2>
-                <p>Infinite nesting, task summaries, state badges, and focus selection.</p>
+                <p>Compact session goals with status-only focus selection.</p>
               </div>
             </div>
             <div className="panel__body">
@@ -57,87 +52,22 @@ export function DashboardShell() {
             </div>
           </section>
 
-          <section className="panel">
+          <section className="panel panel--canvas">
             <div className="panel__header">
               <div>
-                <h2>Intent Graph Surface</h2>
-                <p>List fallback for graph-heavy exploration, wired to token-range detail.</p>
+                <h2>Execution Canvas</h2>
+                <p>Click a session to expand its agent, thinking, and tool-call graph.</p>
               </div>
             </div>
             <div className="panel__body">
-              <div className="metric-strip">
-                <article className="metric-card">
-                  <span>Focused Session</span>
-                  <strong>{activeSession?.label ?? "n/a"}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Session State</span>
-                  <strong>{activeSession?.status ?? "n/a"}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Current Intent</span>
-                  <strong>{visibleIntents.length}</strong>
-                </article>
-              </div>
-              <IntentList
-                intents={visibleIntents}
-                onSelectIntent={selectIntent}
-                selectedIntentId={selectedIntentId}
-              />
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel__header">
-              <div>
-                <h2>Detail Rail</h2>
-                <p>Approval queue, event timeline, and raw token viewer for the selected intent.</p>
-              </div>
-            </div>
-            <div className="panel__body">
-              <div className="detail-grid">
-                <section>
-                  <div className="panel__header" style={{ padding: 0, borderBottom: "none" }}>
-                    <div>
-                      <h3>Approval Queue</h3>
-                      <p>Human-in-the-loop decisions before risky actions execute.</p>
-                    </div>
-                  </div>
-                  <ApprovalList approvals={data.approvals} />
-                </section>
-
-                <section>
-                  <div className="panel__header" style={{ padding: 0, borderBottom: "none" }}>
-                    <div>
-                      <h3>Raw Tokens</h3>
-                      <p>
-                        Token-range drill-down for <strong>{activeIntent?.title ?? "selected intent"}</strong>.
-                      </p>
-                    </div>
-                  </div>
-                  <TokenViewer tokens={visibleTokens} />
-                </section>
-
-                <section>
-                  <div className="panel__header" style={{ padding: 0, borderBottom: "none" }}>
-                    <div>
-                      <h3>Latest Events</h3>
-                      <p>Realtime summary cards translated from the gateway contract.</p>
-                    </div>
-                  </div>
-                  <div className="timeline">
-                    {data.events.map((event) => (
-                      <article className="event-card" key={event.id}>
-                        <div className="detail-row">
-                          <strong>{event.title}</strong>
-                          <span className="muted">{new Date(event.happenedAt).toLocaleTimeString()}</span>
-                        </div>
-                        <p className="approval-card__justification">{event.detail}</p>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              </div>
+              {activeSession ? (
+                <SessionCanvas
+                  intents={data.intents}
+                  selectedSession={activeSession}
+                  sessions={data.sessions}
+                  tokens={data.tokens}
+                />
+              ) : null}
             </div>
           </section>
         </div>
