@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # AWS Bedrock
     bedrock_region: str = "ap-southeast-2"
-    bedrock_model: str = "au.anthropic.claude-opus-4-6-v1"
+    bedrock_model: str = "au.anthropic.claude-haiku-4-5-20251001-v1:0"
     bedrock_api_key: str = ""
 
     # Logfire
