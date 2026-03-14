@@ -170,13 +170,34 @@ async def process_runtime_message(
     on_event: EventCallback = _noop_event,
     interrupt: asyncio.Event | None = None,
 ) -> str:
-    output, runtime.message_history = await _iter_agent(
-        runtime.agent,
+    output, runtime.message_history = await process_message(
+        runtime.deps.session_id,
         message,
+        runtime.deps.manager,
+        runtime.agent,
         runtime.deps,
         runtime.message_history,
-        on_event,
-        interrupt,
+        on_event=on_event,
+        interrupt=interrupt,
+    )
+    return output
+
+
+async def run_session(
+    session: Session,
+    manager: SessionManager,
+    message: str,
+    on_event: EventCallback = _noop_event,
+    interrupt: asyncio.Event | None = None,
+) -> str:
+    """Compatibility helper for one-off session execution in tests and scripts."""
+    runtime = create_session_runtime(session, manager)
+    session.state = SessionState.RUNNING
+    output = await process_runtime_message(
+        runtime,
+        message,
+        on_event=on_event,
+        interrupt=interrupt,
     )
     return output
 
