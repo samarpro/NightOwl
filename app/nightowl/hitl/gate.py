@@ -43,6 +43,20 @@ class HITLGate:
         """Record the last messaging channel for a session."""
         self._channels[session_id] = {"channel": channel, "chat_id": chat_id}
 
+    def _resolve_channel(self, session_id: str) -> dict[str, str] | None:
+        """Find channel info for a session, walking up the parent chain if needed."""
+        info = self._channels.get(session_id)
+        if info:
+            return info
+        # Walk up to parent — child sessions inherit the main session's channel
+        session = self._manager.get_session(session_id)
+        while session and session.parent_id:
+            info = self._channels.get(session.parent_id)
+            if info:
+                return info
+            session = self._manager.get_session(session.parent_id)
+        return None
+
     async def _broadcast_event(self, event: dict[str, Any]) -> None:
         if self._event_bus is not None:
             await self._event_bus.publish(event)
@@ -58,7 +72,7 @@ class HITLGate:
         if self._registry is None:
             log.info("No channel registry configured for approval %s", approval_id)
             return
-        channel_info = self._channels.get(session_id)
+        channel_info = self._resolve_channel(session_id)
         if not channel_info:
             return
         bridge = self._registry.get(channel_info["channel"])
@@ -89,7 +103,7 @@ class HITLGate:
         approval_id = f"approval:{uuid.uuid4().hex[:12]}"
         event = asyncio.Event()
         expires_at = datetime.now(UTC) + timedelta(seconds=self._timeout_seconds)
-        channel_info = self._channels.get(session_id)
+        channel_info = self._resolve_channel(session_id)
         result: dict[str, Any] = {
             "approved": False,
             "reason": None,
