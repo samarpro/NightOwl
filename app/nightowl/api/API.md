@@ -22,6 +22,17 @@ FastAPI routers that expose NightOwl's HTTP and WebSocket interface. All routes 
 
 `GET /api/v1/composio/auth/callback` — Composio redirects here when a user completes an OAuth flow. Resolves the pending `AuthWaiter` event so the blocked tool execution can retry.
 
+### Skills (`routers/skills.py`)
+
+CRUD API for skill management:
+
+- `GET /api/v1/skills/` — list all skills (enabled and disabled)
+- `GET /api/v1/skills/{name}` — full skill details including body
+- `POST /api/v1/skills/upload` — upload a SKILL.md file
+- `POST /api/v1/skills/` — create/update from raw content
+- `DELETE /api/v1/skills/{name}` — delete skill and its resources
+- `PATCH /api/v1/skills/{name}/toggle` — enable or disable
+
 ### WebSocket (`routers/websocket.py`)
 
 `WS /ws` — bidirectional WebSocket. Server pushes `RuntimeEvent` envelopes from the `RuntimeBroadcaster`. Client can send `approval.respond` messages to resolve pending approvals without a separate HTTP call.

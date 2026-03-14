@@ -37,13 +37,13 @@ Depth limits and max children per session are enforced by `SessionManager` using
 
 Owns all session state and queues. Handles creation, spawning, completion, and event routing. When a child completes, the manager delivers a `TaskCompletionEvent` as a message into the parent's asyncio queue — this is how the parent receives results without polling. Completed children are removed from the parent's children list, freeing the slot for new spawns.
 
-Background child sessions are launched as `asyncio.Task`s via the configurable `_child_runner` callable. The manager also holds references to the `SessionStore` (persistence), `ChannelRegistry`, and `HITLGate`.
+Background child sessions are launched as `asyncio.Task`s via the configurable `_child_runner` callable. The manager also holds references to the `SessionStore` (persistence), `ChannelRegistry`, `HITLGate`, `DockerSandboxManager`, and `SkillStore`.
 
 On server startup, `load_and_resume()` restores the most recent active main session from the database, including its full message history. Orphaned child sessions (left running from a previous process) are marked as failed.
 
 ### Runner (`runner.py`)
 
-Executes Pydantic AI agents using `agent.iter()` for streaming node-level visibility. Each node (model request, tool call, end) emits an event via the callback.
+Executes Pydantic AI agents using `agent.iter()` for streaming node-level visibility. Each node (model request, tool call, end) emits an event via the callback. Agents are created with a `history_processors` hook that triggers proactive context compaction (see below).
 
 The runner provides two layers of abstraction:
 
@@ -67,7 +67,7 @@ Four Pydantic AI tools for session management (spawn, list, and complete are reg
 - **`sessions_send`** — bidirectional messaging: send to a child (steering) or to your parent (progress updates, questions). Messages are prefixed with system markers so agents can distinguish parent vs child messages from user messages.
 - **`sessions_complete`** — tells a child session to wrap up and exit
 
-`AgentState` is the deps dataclass threaded through all tool calls, carrying the session ID, manager, HITL gate, channel registry, and session store.
+`AgentState` is the deps dataclass threaded through all tool calls, carrying the session ID, manager, HITL gate, channel registry, session store, skill store, and sandbox manager.
 
 ### Session Store (`store.py`)
 
@@ -82,6 +82,17 @@ Generates system prompts scoped to session role. Key rules injected into all pro
 - **No-poll rule** — parents wait for completion events, never poll
 
 Main agents get the full identity and all tool descriptions. Orchestrators get their task context, parent reference, and can message their parent. Leaf agents get an explicit "you cannot spawn" instruction but can still message their parent.
+
+### Context Compaction (`context_compaction.py`)
+
+Proactive summarization to prevent context window overflow. Runs as a Pydantic AI `history_processor` hook before every model request:
+
+1. Truncates oversized tool results (>20k chars) in-place on every turn
+2. When estimated tokens exceed 70% of the context window, splits history into old and recent messages
+3. Summarizes old messages via a dedicated summarizer agent, preserving all factual data, decisions, and pending tasks
+4. Replaces old messages with a compact 2-message summary pair
+
+Also provides reactive detection of context overflow errors (400/413) for fallback handling.
 
 ### Depth Resolution (`depth.py`)
 

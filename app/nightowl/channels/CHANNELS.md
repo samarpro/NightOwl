@@ -33,3 +33,13 @@ Central registry that tracks registered bridges, last-used channel per user, and
 - **SMSBridge** (`sms.py`) — uses Twilio SMS API. Same text-based approval pattern as WhatsApp.
 
 Telegram is registered automatically in `main.py` when `TELEGRAM_BOT_TOKEN` is set. WhatsApp and SMS require Twilio credentials.
+
+### Message Formatting (`formatting.py`)
+
+Converts LLM markdown output to each channel's native rich text format:
+
+- **`markdown_to_telegram_html`** — Telegram HTML (`<b>`, `<i>`, `<code>`, `<pre>`, `<a>`)
+- **`markdown_to_whatsapp`** — WhatsApp markup (`*bold*`, `_italic_`, `` ```code``` ``)
+- **`markdown_to_plaintext`** — clean plain text with Unicode structure (for SMS)
+
+Handles code blocks, headers, bold/italic, strikethrough, links, lists, blockquotes, and horizontal rules.

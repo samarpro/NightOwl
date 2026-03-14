@@ -82,17 +82,18 @@ pdm run pytest
 
 ```
 app/nightowl/
-├── api/            # FastAPI routers (health, ingest, approvals, webhooks, WebSocket)
-├── sessions/       # Session manager, agent runner, tools, persistence store
-├── hitl/           # Risk classifier and approval gate
+├── api/            # FastAPI routers (health, ingest, approvals, skills, webhooks, WebSocket)
+├── sessions/       # Session manager, runner, tools, persistence, context compaction
+├── hitl/           # Risk classifier, approval gate, @hitl_gated decorator
 ├── composio_tools/ # Composio MCP tool router, meta-tools, and transparent OAuth
-├── channels/       # Channel bridges (Telegram, WhatsApp, SMS)
+├── channels/       # Channel bridges (Telegram, WhatsApp, SMS) + message formatting
 ├── events/         # Event bus (Redis), runtime broadcaster, WS event translation
 ├── ingest/         # Ingress service — routes channel messages to sessions
-├── sandbox/        # Docker sandbox manager and tools (scaffolded)
+├── sandbox/        # Docker sandbox manager + bash/browser/computer-use tools
+├── skills/         # Skill parser, store, loader, and agent tools
 ├── models/         # Pydantic data models
+├── db/             # SQLAlchemy models + Alembic migrations
 ├── config.py       # pydantic-settings configuration
-├── db.py           # Database initialization
 ├── cli.py          # Interactive CLI chat
 └── main.py         # FastAPI app entrypoint + lifespan wiring
 ```
