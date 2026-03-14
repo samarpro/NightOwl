@@ -16,20 +16,26 @@ export function toDashboardState(snapshot: DashboardSnapshot): DashboardState {
 
 export function applyGatewayEvent(state: DashboardState, event: GatewayEventDto): DashboardState {
   switch (event.eventType) {
-    case "session.updated":
+    case "session.updated": {
+      const payload = event.payload;
+      if (isApiSessionPayload(payload)) {
+        return state;
+      }
+
       return {
         ...state,
         sessions: state.sessions.map((session) =>
-          session.id === event.payload.sessionId
+          session.id === payload.sessionId
             ? {
                 ...session,
-                status: event.payload.status,
-                currentIntent: event.payload.currentIntent,
-                waitReason: event.payload.waitReason
+                status: payload.status,
+                currentIntent: payload.currentIntent,
+                waitReason: payload.waitReason
               }
             : session,
         )
       };
+    }
     case "approval.requested":
       return {
         ...state,
@@ -44,4 +50,10 @@ export function applyGatewayEvent(state: DashboardState, event: GatewayEventDto)
     default:
       return state;
   }
+}
+
+function isApiSessionPayload(
+  payload: Extract<GatewayEventDto, { eventType: "session.updated" }>["payload"]
+): payload is Extract<GatewayEventDto, { eventType: "session.updated" }>["payload"] & { id: string } {
+  return "id" in payload;
 }

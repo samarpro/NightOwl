@@ -35,6 +35,18 @@ export const skillSummarySchema = z.object({
   user_invocable: z.boolean(),
   enabled: z.boolean()
 });
+export const shadowCreateResponseSchema = z.object({
+  shadow_id: z.string().min(1),
+  session_id: z.string().min(1)
+});
+export const shadowMessageResponseSchema = z.object({
+  reply: z.string(),
+  shadow_id: z.string().min(1)
+});
+export const shadowCorrectResponseSchema = z.object({
+  status: z.string().min(1),
+  shadow_id: z.string().min(1)
+});
 
 export const sessionNodeSchema = z.object({
   id: z.string(),
@@ -62,6 +74,14 @@ export const apiSessionSchema = z.object({
   createdAt: z.string().nullable(),
   completedAt: z.string().nullable(),
   result: z.string().nullable()
+});
+export const apiSessionMessagePartSchema = z.object({
+  type: z.string().min(1),
+  content: z.unknown()
+});
+export const apiSessionMessageSchema = z.object({
+  kind: z.string().min(1),
+  parts: z.array(apiSessionMessagePartSchema)
 });
 
 export const intentNodeSchema = z.object({
@@ -99,17 +119,38 @@ export const tokenEntrySchema = z.object({
   content: z.string()
 });
 
+export const dashboardSessionSnapshotSchema = z.object({
+  rootSessions: z.array(apiSessionSchema),
+  childSessions: z.array(apiSessionSchema),
+  selectedSessionId: z.string().nullable()
+});
+
 export const eventSchema = z.discriminatedUnion("eventType", [
+  z.object({
+    eventId: z.string(),
+    eventType: z.literal("dashboard.snapshot"),
+    occurredAt: z.string(),
+    payload: dashboardSessionSnapshotSchema
+  }),
+  z.object({
+    eventId: z.string(),
+    eventType: z.literal("session.created"),
+    occurredAt: z.string(),
+    payload: apiSessionSchema
+  }),
   z.object({
     eventId: z.string(),
     eventType: z.literal("session.updated"),
     occurredAt: z.string(),
-    payload: z.object({
-      sessionId: z.string(),
-      status: sessionStatusSchema,
-      currentIntent: z.string(),
-      waitReason: z.string().nullable()
-    })
+    payload: z.union([
+      apiSessionSchema,
+      z.object({
+        sessionId: z.string(),
+        status: sessionStatusSchema,
+        currentIntent: z.string(),
+        waitReason: z.string().nullable()
+      })
+    ])
   }),
   z.object({
     eventId: z.string(),
@@ -144,12 +185,18 @@ export const dashboardSnapshotSchema = z.object({
 });
 
 export type DashboardSnapshot = z.infer<typeof dashboardSnapshotSchema>;
+export type DashboardSessionSnapshotDto = z.infer<typeof dashboardSessionSnapshotSchema>;
 export type ChannelMessageDto = z.infer<typeof channelMessageSchema>;
 export type IngestMessageResponseDto = z.infer<typeof ingestMessageResponseSchema>;
 export type SkillSaveResponseDto = z.infer<typeof skillSaveResponseSchema>;
 export type SkillSummaryDto = z.infer<typeof skillSummarySchema>;
+export type ShadowCreateResponseDto = z.infer<typeof shadowCreateResponseSchema>;
+export type ShadowMessageResponseDto = z.infer<typeof shadowMessageResponseSchema>;
+export type ShadowCorrectResponseDto = z.infer<typeof shadowCorrectResponseSchema>;
 export type SessionNodeDto = z.infer<typeof sessionNodeSchema>;
 export type ApiSessionDto = z.infer<typeof apiSessionSchema>;
+export type ApiSessionMessagePartDto = z.infer<typeof apiSessionMessagePartSchema>;
+export type ApiSessionMessageDto = z.infer<typeof apiSessionMessageSchema>;
 export type IntentNodeDto = z.infer<typeof intentNodeSchema>;
 export type ApprovalDto = z.infer<typeof approvalSchema>;
 export type TokenEntryDto = z.infer<typeof tokenEntrySchema>;

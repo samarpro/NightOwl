@@ -12,6 +12,11 @@ const navItems = [
     description: "Delivery surfaces, status, and channel inventory"
   },
   {
+    to: "/prompts",
+    label: "Prompts",
+    description: "Agent system prompts and prompt engineering"
+  },
+  {
     to: "/settings",
     label: "Settings",
     description: "Skills import, models, and configuration policy"

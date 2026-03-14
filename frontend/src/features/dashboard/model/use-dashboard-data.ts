@@ -1,26 +1,42 @@
 import { useQuery } from "@tanstack/react-query";
+import { useDashboardSessionStream } from "features/dashboard/model/use-dashboard-session-stream";
+import type { SessionNode } from "entities/session/model/types";
 import { fetchChildSessions, fetchRootSessions } from "shared/api/sessions";
 
-const rootSessionsQueryKey = ["sessions", "roots"] as const;
+const EMPTY_SESSIONS: SessionNode[] = [];
 
 export function useDashboardData(selectedSessionId: string | null) {
   const rootSessionsQuery = useQuery({
-    queryKey: rootSessionsQueryKey,
+    queryKey: ["sessions", "roots"],
     queryFn: fetchRootSessions
   });
 
   const childSessionsQuery = useQuery({
-    queryKey: [...rootSessionsQueryKey, selectedSessionId, "children"],
+    queryKey: ["sessions", "children", selectedSessionId],
     queryFn: () => fetchChildSessions(selectedSessionId as string),
     enabled: selectedSessionId !== null
   });
 
-  const rootSessions = rootSessionsQuery.data ?? [];
-  const childSessions = childSessionsQuery.data ?? [];
+  const fetchedRootSessions = rootSessionsQuery.data ?? EMPTY_SESSIONS;
+  const fetchedChildSessions = childSessionsQuery.data ?? EMPTY_SESSIONS;
+
+  const {
+    childSessions,
+    rootSessions,
+    websocketError,
+    websocketLabel,
+    websocketStatus
+  } = useDashboardSessionStream(
+    selectedSessionId,
+    fetchedRootSessions,
+    fetchedChildSessions
+  );
   const activeStatuses = new Set(["running", "waiting", "blocked"]);
   const activeRootCount = rootSessions.filter((session) => activeStatuses.has(session.status)).length;
   const routedChannels = new Set(rootSessions.map((session) => session.channel).filter(Boolean));
   const pendingRoots = rootSessions.filter((session) => session.waitReason !== null).length;
+  const rootSessionsError = rootSessionsQuery.error ?? websocketError;
+  const childSessionsError = childSessionsQuery.error ?? websocketError;
 
   return {
     rootSessions,
@@ -28,9 +44,11 @@ export function useDashboardData(selectedSessionId: string | null) {
     tasksActive: activeRootCount,
     pendingApprovals: pendingRoots,
     liveChannels: routedChannels.size,
-    isLoading: rootSessionsQuery.isLoading || childSessionsQuery.isLoading,
+    isLoading: rootSessionsQuery.isLoading || (selectedSessionId !== null && childSessionsQuery.isLoading),
     isFetching: rootSessionsQuery.isFetching || childSessionsQuery.isFetching,
-    rootSessionsError: rootSessionsQuery.error,
-    childSessionsError: childSessionsQuery.error
+    rootSessionsError,
+    childSessionsError,
+    websocketStatus,
+    websocketLabel
   };
 }

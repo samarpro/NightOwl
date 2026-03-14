@@ -270,7 +270,7 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
     )
     deps._token_store = getattr(manager, "token_store", None)
     session.state = SessionState.RUNNING
-    await manager._emit({"type": "session:running", "session_id": session.id})
+    await manager._emit({"type": "session:running", "session_id": session.id, "session": session.model_dump()})
 
     output, history = await _iter_agent(agent, session.task, deps, None, manager._emit)
 
@@ -279,14 +279,14 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
     if queue:
         while True:
             session.state = SessionState.WAITING
-            await manager._emit({"type": "session:waiting", "session_id": session.id})
+            await manager._emit({"type": "session:waiting", "session_id": session.id, "session": session.model_dump()})
             try:
                 msg = await asyncio.wait_for(queue.get(), timeout=_CHILD_IDLE_TIMEOUT)
             except asyncio.TimeoutError:
                 log.info("Child session %s idle for %ds, completing", session.id, _CHILD_IDLE_TIMEOUT)
                 break
             session.state = SessionState.RUNNING
-            await manager._emit({"type": "session:running", "session_id": session.id})
+            await manager._emit({"type": "session:running", "session_id": session.id, "session": session.model_dump()})
             output, history = await _iter_agent(agent, msg, deps, history, manager._emit)
 
     await manager.complete_session(session.id, output)

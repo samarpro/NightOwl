@@ -1,6 +1,7 @@
 import { createRootRoute, createRoute, createRouter, Outlet, redirect } from "@tanstack/react-router";
 import { DashboardPage } from "pages/dashboard";
 import { ChannelsPage } from "pages/channels";
+import { PromptsPage } from "pages/prompts";
 import { SettingsPage } from "pages/settings";
 import { AppNavbar } from "widgets/app-navbar/ui/app-navbar";
 
@@ -45,7 +46,13 @@ const settingsRoute = createRoute({
   component: SettingsPage
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, sessionsRoute, channelsRoute, settingsRoute]);
+const promptsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/prompts",
+  component: PromptsPage
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, sessionsRoute, channelsRoute, settingsRoute, promptsRoute]);
 
 export const router = createRouter({
   routeTree

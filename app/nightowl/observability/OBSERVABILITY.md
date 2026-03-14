@@ -38,3 +38,7 @@ The observability router (`api/routers/observability.py`) exposes:
 - `GET /api/v1/observability/intent-graphs` — all session graphs
 - `GET /api/v1/observability/tokens/{session_id}?last=N` — recent raw token entries
 - `POST /api/v1/observability/intent-graph/{session_id}/process` — manually trigger classification
+
+okay, in the frontend, their is learning.md.
+read that file to understand how to connect the backend with the front. 
+The feature.

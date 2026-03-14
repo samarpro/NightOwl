@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from nightowl.events.schemas import RuntimeEvent
+from nightowl.sessions.store import serialize_session
 
 
 def _preview(text: str | None, limit: int = 140) -> str:
@@ -18,19 +19,20 @@ def _preview(text: str | None, limit: int = 140) -> str:
 
 
 def _session_updated_payload(raw: dict[str, Any], status: str) -> RuntimeEvent:
-    session_id = raw.get("session_id")
+    session = raw.get("session", {})
+    session_payload = serialize_session({
+        **session,
+        "id": session.get("id", raw.get("session_id")),
+        "state": status,
+        "result": session.get("result", raw.get("result")),
+    })
     return RuntimeEvent(
         event_id=f"event:{uuid.uuid4().hex[:12]}",
         event_type="session.updated",
         occurred_at=datetime.now(UTC),
-        session_id=session_id,
+        session_id=session_payload["id"],
         channel=raw.get("channel"),
-        payload={
-            "sessionId": session_id,
-            "status": status,
-            "currentIntent": raw.get("current_intent", ""),
-            "waitReason": raw.get("wait_reason"),
-        },
+        payload=session_payload,
     )
 
 
@@ -48,12 +50,7 @@ def translate_runtime_event(raw: dict[str, Any]) -> RuntimeEvent | None:
             occurred_at=datetime.now(UTC),
             session_id=session_id,
             channel=raw.get("channel"),
-            payload={
-                "sessionId": session_id,
-                "role": session.get("role"),
-                "task": session.get("task"),
-                "channel": raw.get("channel"),
-            },
+            payload=serialize_session(session),
         )
 
     if raw_type == "session:resumed":
@@ -87,15 +84,10 @@ def translate_runtime_event(raw: dict[str, Any]) -> RuntimeEvent | None:
         child = raw.get("child", {})
         return RuntimeEvent(
             event_id=f"event:{uuid.uuid4().hex[:12]}",
-            event_type="session.updated",
+            event_type="session.created",
             occurred_at=datetime.now(UTC),
             session_id=child.get("id"),
-            payload={
-                "sessionId": child.get("id"),
-                "status": child.get("state", "pending"),
-                "currentIntent": child.get("task", ""),
-                "waitReason": None,
-            },
+            payload=serialize_session(child),
         )
 
     if raw_type == "channel:message_received":

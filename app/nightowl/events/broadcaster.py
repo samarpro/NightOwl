@@ -20,7 +20,7 @@ class RuntimeBroadcaster:
         translated = translate_runtime_event(event)
         if translated is None:
             return
-        payload = translated.model_dump(mode="json")
+        payload = translated.model_dump(mode="json", by_alias=True)
         for queue in list(self._subscribers):
             await queue.put(payload)
 
@@ -32,4 +32,3 @@ class RuntimeBroadcaster:
                 yield await queue.get()
         finally:
             self._subscribers.discard(queue)
-

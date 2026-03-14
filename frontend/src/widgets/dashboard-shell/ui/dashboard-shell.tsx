@@ -4,6 +4,7 @@ import { useSelectionStore } from "features/session-controls/model/selection-sto
 import { useDashboardData } from "features/dashboard/model/use-dashboard-data";
 import { SessionCanvas } from "features/session-canvas/ui/session-canvas";
 import { SessionTree } from "widgets/dashboard-shell/ui/session-tree";
+import { IntentGraph } from "features/intention-graph/ui/intent-graph";
 
 export function DashboardShell() {
   const { selectedSessionId, selectSession } = useSelectionStore();
@@ -15,7 +16,9 @@ export function DashboardShell() {
     pendingApprovals,
     rootSessions,
     rootSessionsError,
-    tasksActive
+    tasksActive,
+    websocketLabel,
+    websocketStatus
   } = useDashboardData(selectedSessionId);
 
   useEffect(() => {
@@ -41,7 +44,7 @@ export function DashboardShell() {
             <div className="panel__header">
               <div>
                 <h2>Dashboard Unavailable</h2>
-                <p>The sessions API could not be reached.</p>
+                <p>The session bootstrap APIs or websocket stream could not be reached.</p>
               </div>
             </div>
             <div className="panel__body">
@@ -68,7 +71,7 @@ export function DashboardShell() {
             <div className="panel__header">
               <div>
                 <h2>No Sessions Yet</h2>
-                <p>`GET /api/v1/sessions/` returned an empty list.</p>
+                <p>The initial sessions API returned no root sessions.</p>
               </div>
             </div>
             <div className="panel__body">
@@ -100,7 +103,7 @@ export function DashboardShell() {
             </p>
           </div>
           <div className="status-row">
-            <span className="pill pill--live">WebSocket live</span>
+            <span className={websocketStatus === "open" ? "pill pill--live" : "pill"}>{websocketLabel}</span>
             <span className="pill">{tasksActive} active tasks</span>
             <span className="pill">{pendingApprovals} waiting roots</span>
             <span className="pill">{liveChannels} routed channels</span>
@@ -112,7 +115,7 @@ export function DashboardShell() {
             <div className="panel__header">
               <div>
                 <h2>Session Tree</h2>
-                <p>Top-level sessions from `/api/v1/sessions/`.</p>
+                <p>Top-level sessions from the sessions API, patched live over websocket.</p>
               </div>
             </div>
             <div className="panel__body">
@@ -128,7 +131,7 @@ export function DashboardShell() {
             <div className="panel__header">
               <div>
                 <h2>Execution Canvas</h2>
-                <p>Direct child sessions from `/api/v1/sessions/?parentId=&lt;session-id&gt;`.</p>
+                <p>Child sessions load from the sessions API and stay current through websocket events.</p>
               </div>
             </div>
             <div className="panel__body">
@@ -140,6 +143,24 @@ export function DashboardShell() {
               ) : activeSession ? (
                 <SessionCanvas selectedSession={activeSession} sessions={canvasSessions} />
               ) : null}
+            </div>
+          </section>
+
+          <section className="panel panel--intent-graph">
+            <div className="panel__header">
+              <div>
+                <h2>Intent Graph</h2>
+                <p>Intent flow for the selected session.</p>
+              </div>
+            </div>
+            <div className="panel__body">
+              {selectedSessionId ? (
+                <IntentGraph sessionId={selectedSessionId} />
+              ) : (
+                <div className="empty-state">
+                  <strong>Select a session to view its intent graph.</strong>
+                </div>
+              )}
             </div>
           </section>
         </div>

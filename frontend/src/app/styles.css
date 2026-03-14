@@ -207,7 +207,7 @@ a {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 0.68fr) minmax(760px, 1.92fr);
+  grid-template-columns: minmax(260px, 0.5fr) minmax(400px, 1fr) minmax(400px, 1fr);
   gap: 18px;
 }
 
@@ -222,7 +222,8 @@ a {
   min-height: 720px;
 }
 
-.panel--canvas .panel__body {
+.panel--canvas .panel__body,
+.panel--intent-graph .panel__body {
   padding: 0;
 }
 
@@ -456,6 +457,7 @@ a {
 
 .session-canvas {
   min-height: 640px;
+  position: relative;
 }
 
 .session-canvas .react-flow {
@@ -481,13 +483,13 @@ a {
 }
 
 .canvas-node {
-  min-width: 248px;
-  max-width: 284px;
+  min-width: 320px;
+  max-width: 360px;
   display: flex;
   position: relative;
   gap: 12px;
   align-items: flex-start;
-  padding: 14px;
+  padding: 26px;
   border-radius: 18px;
   border: 1px solid var(--line);
   background: rgba(16, 19, 23, 0.96);
@@ -538,6 +540,7 @@ a {
   color: var(--text-soft);
   font-size: 0.8rem;
   line-height: 1.4;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -550,20 +553,39 @@ a {
   color: var(--safe);
 }
 
-.canvas-node--thinking {
-  border-color: rgba(241, 191, 76, 0.18);
+.canvas-node--text {
+  border-color: rgba(116, 159, 255, 0.28);
+  background: rgba(12, 19, 31, 0.96);
 }
 
-.canvas-node--thinking .canvas-node__icon {
-  color: var(--warn);
+.canvas-node--text .canvas-node__content strong {
+  color: #a9c7ff;
 }
 
-.canvas-node--tool {
-  border-color: rgba(212, 108, 61, 0.24);
+.canvas-node--tool-call {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-color: rgba(212, 108, 61, 0.34);
+  background: rgba(36, 18, 11, 0.96);
 }
 
-.canvas-node--tool .canvas-node__icon {
+.canvas-node--tool-call:hover {
+  border-color: rgba(212, 108, 61, 0.58);
+  transform: translateY(-1px);
+}
+
+.canvas-node--tool-call .canvas-node__icon {
   color: var(--signal);
+}
+
+.canvas-node--tool-result {
+  border-color: rgba(241, 191, 76, 0.3);
+  background: rgba(33, 28, 11, 0.96);
+}
+
+.canvas-node--tool-result .canvas-node__content strong {
+  color: #f1bf4c;
 }
 
 .canvas-node__handle {
@@ -589,6 +611,82 @@ a {
   stroke-linecap: round;
   stroke-width: 0.8;
   pointer-events: none;
+}
+
+.session-canvas__overlay {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 5;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 107, 115, 0.3);
+  background: rgba(44, 15, 19, 0.94);
+  color: #f1b4b9;
+}
+
+.session-shadow-panel {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 6;
+  width: min(420px, calc(100% - 36px));
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(14, 18, 22, 0.96);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.38);
+}
+
+.session-shadow-panel__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-shadow-panel__header div {
+  display: grid;
+  gap: 4px;
+}
+
+.session-shadow-panel__header span {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+.session-shadow-panel__input {
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+}
+
+.session-shadow-panel__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.session-shadow-panel__reply {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(89, 196, 141, 0.18);
+  background: rgba(12, 28, 19, 0.88);
+}
+
+.session-shadow-panel__reply p {
+  margin: 0;
+  color: var(--text-muted);
+  white-space: pre-wrap;
 }
 
 .channels-layout {
@@ -1159,4 +1257,67 @@ a {
   .metric-strip {
     grid-template-columns: 1fr;
   }
+}
+
+.intent-graph-container .react-flow {
+  background:
+    radial-gradient(circle at top left, rgba(212, 108, 61, 0.11), transparent 24%),
+    linear-gradient(180deg, rgba(15, 18, 22, 0.92), rgba(11, 14, 17, 0.98));
+}
+
+.intent-graph-container .react-flow__controls {
+  border: 1px solid var(--line);
+  box-shadow: none;
+  background: rgba(20, 24, 28, 0.88);
+}
+
+.intent-graph-container .react-flow__controls-button {
+  background: transparent;
+  border-bottom-color: var(--line);
+  color: var(--text-muted);
+}
+
+.intent-graph-container .react-flow__attribution {
+  display: none;
+}
+
+.intent-graph-loading,
+.intent-graph-error,
+.intent-graph-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 500px;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.panel--intent-graph .panel__body {
+  padding: 0;
+}
+
+.prompt-textarea {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(212, 108, 61, 0.22);
+  background:
+    linear-gradient(180deg, rgba(9, 13, 18, 0.94), rgba(16, 22, 28, 0.92)),
+    linear-gradient(135deg, rgba(212, 108, 61, 0.08), transparent 46%);
+  color: var(--text);
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.prompt-textarea:focus {
+  outline: none;
+  border-color: rgba(212, 108, 61, 0.42);
+  box-shadow: 0 0 0 1px rgba(212, 108, 61, 0.22);
+}
+
+.prompt-textarea::placeholder {
+  color: var(--text-soft);
 }

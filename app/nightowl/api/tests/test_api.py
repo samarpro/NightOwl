@@ -30,10 +30,75 @@ class TestApi:
         finally:
             settings.telegram_webhook_secret = original_secret
 
-    def test_websocket_streams_translated_events(self):
+    def test_websocket_sends_initial_session_snapshot(self):
+        app = create_app()
+        root_session_id = "session:test-root"
+        child_session_id = "session:test-child"
+
+        with TestClient(app) as client:
+            client.portal.call(_delete_sessions, client.app.state.session_factory, [root_session_id, child_session_id])
+            client.portal.call(
+                _insert_sessions,
+                client.app.state.session_factory,
+                [
+                    {"id": root_session_id, "parent_id": None, "task": "Root task", "role": "main", "depth": 0},
+                    {"id": child_session_id, "parent_id": root_session_id, "task": "Child task", "role": "leaf", "depth": 1},
+                ],
+            )
+
+            with client.websocket_connect("/ws") as websocket:
+                event = websocket.receive_json()
+
+            client.portal.call(_delete_sessions, client.app.state.session_factory, [root_session_id, child_session_id])
+
+        assert event["eventType"] == "dashboard.snapshot"
+        assert event["payload"]["selectedSessionId"] is None
+        assert root_session_id in {session["id"] for session in event["payload"]["rootSessions"]}
+        assert all(session["id"] != child_session_id for session in event["payload"]["rootSessions"])
+        assert event["payload"]["childSessions"] == []
+
+    def test_websocket_subscribe_returns_child_sessions_for_selected_root(self):
+        app = create_app()
+        parent_session_id = "session:test-parent"
+        child_session_ids = ["session:test-child-a", "session:test-child-b"]
+
+        with TestClient(app) as client:
+            client.portal.call(
+                _delete_sessions,
+                client.app.state.session_factory,
+                [parent_session_id, *child_session_ids],
+            )
+            client.portal.call(
+                _insert_sessions,
+                client.app.state.session_factory,
+                [
+                    {"id": parent_session_id, "parent_id": None, "task": "Parent", "role": "main", "depth": 0},
+                    {"id": child_session_ids[0], "parent_id": parent_session_id, "task": "Child A", "role": "leaf", "depth": 1},
+                    {"id": child_session_ids[1], "parent_id": parent_session_id, "task": "Child B", "role": "leaf", "depth": 1},
+                ],
+            )
+
+            with client.websocket_connect("/ws") as websocket:
+                websocket.receive_json()
+                websocket.send_json({"type": "dashboard.subscribe", "sessionId": parent_session_id})
+                event = websocket.receive_json()
+
+            client.portal.call(
+                _delete_sessions,
+                client.app.state.session_factory,
+                [parent_session_id, *child_session_ids],
+            )
+
+        assert event["eventType"] == "dashboard.snapshot"
+        assert event["payload"]["selectedSessionId"] == parent_session_id
+        assert {session["id"] for session in event["payload"]["childSessions"]} == set(child_session_ids)
+        assert all(session["parentId"] == parent_session_id for session in event["payload"]["childSessions"])
+
+    def test_websocket_streams_translated_events_with_camel_case_envelope(self):
         app = create_app()
         with TestClient(app) as client:
             with client.websocket_connect("/ws") as websocket:
+                websocket.receive_json()
                 client.portal.call(
                     client.app.state.broadcaster.publish,
                     {
@@ -47,7 +112,38 @@ class TestApi:
                     },
                 )
                 event = websocket.receive_json()
-                assert event["event_type"] == "approval.requested"
+                assert event["eventType"] == "approval.requested"
+                assert event["payload"]["toolName"] == "TOOL"
+
+    def test_websocket_session_events_include_session_snapshot_payload(self):
+        app = create_app()
+        with TestClient(app) as client:
+            with client.websocket_connect("/ws") as websocket:
+                websocket.receive_json()
+                client.portal.call(
+                    client.app.state.broadcaster.publish,
+                    {
+                        "type": "session:spawned",
+                        "child": {
+                            "id": "session:test-child",
+                            "parent_id": "session:test-parent",
+                            "role": "leaf",
+                            "state": "pending",
+                            "depth": 1,
+                            "task": "Child task",
+                            "label": "Child agent",
+                            "sandbox_mode": "none",
+                            "result": None,
+                        },
+                    },
+                )
+                event = websocket.receive_json()
+
+        assert event["eventType"] == "session.created"
+        assert event["payload"]["id"] == "session:test-child"
+        assert event["payload"]["parentId"] == "session:test-parent"
+        assert event["payload"]["state"] == "pending"
+        assert event["payload"]["task"] == "Child task"
 
     def test_sessions_endpoint_lists_root_sessions_by_default(self):
         app = create_app()

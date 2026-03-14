@@ -166,21 +166,45 @@ class SessionStore:
 
 
 def _serialize_session_row(row: SessionRow) -> dict[str, Any]:
+    return serialize_session(session=row)
+
+
+def serialize_session(session: Session | SessionRow | dict[str, Any]) -> dict[str, Any]:
+    if isinstance(session, dict):
+        return {
+            "id": session.get("id"),
+            "parentId": session.get("parent_id"),
+            "role": _enum_value(session.get("role")),
+            "state": _enum_value(session.get("state")),
+            "depth": session.get("depth", 0),
+            "task": session.get("task"),
+            "label": session.get("label"),
+            "sandboxMode": _enum_value(session.get("sandbox_mode")),
+            "channelRoute": session.get("channel_route"),
+            "createdAt": _isoformat(session.get("created_at")),
+            "completedAt": _isoformat(session.get("completed_at")),
+            "result": session.get("result"),
+        }
+
     return {
-        "id": row.id,
-        "parentId": row.parent_id,
-        "role": row.role,
-        "state": row.state,
-        "depth": row.depth,
-        "task": row.task,
-        "label": row.label,
-        "sandboxMode": row.sandbox_mode,
-        "channelRoute": row.channel_route,
-        "createdAt": _isoformat(row.created_at),
-        "completedAt": _isoformat(row.completed_at),
-        "result": row.result,
+        "id": session.id,
+        "parentId": session.parent_id,
+        "role": _enum_value(session.role),
+        "state": _enum_value(session.state),
+        "depth": session.depth,
+        "task": session.task,
+        "label": session.label,
+        "sandboxMode": _enum_value(getattr(session, "sandbox_mode", None)),
+        "channelRoute": getattr(session, "channel_route", None),
+        "createdAt": _isoformat(getattr(session, "created_at", None)),
+        "completedAt": _isoformat(getattr(session, "completed_at", None)),
+        "result": getattr(session, "result", None),
     }
 
 
 def _isoformat(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
+
+
+def _enum_value(value: Any) -> Any:
+    return value.value if hasattr(value, "value") else value

@@ -147,7 +147,13 @@ class SessionManager:
                 log.info("Cleaned up sandbox container %s for session %s", container_id, session_id)
 
         await self._emit(
-            {"type": "session:completed", "session_id": session_id, "success": success}
+            {
+                "type": "session:completed",
+                "session_id": session_id,
+                "success": success,
+                "session": session.model_dump(),
+                "result": result,
+            }
         )
         if self.store:
             await self.store.update_session_state(session_id, session.state, result)

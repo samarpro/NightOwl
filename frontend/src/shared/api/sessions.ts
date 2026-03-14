@@ -1,8 +1,9 @@
 import { toSessionNode } from "entities/session/model/adapters";
-import { apiSessionSchema } from "shared/api/contracts";
+import { apiSessionMessageSchema, apiSessionSchema } from "shared/api/contracts";
 import { z } from "zod";
 
 const sessionListSchema = z.array(apiSessionSchema);
+const sessionMessageListSchema = z.array(apiSessionMessageSchema);
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
 export async function fetchRootSessions() {
@@ -14,6 +15,16 @@ export async function fetchChildSessions(parentId: string) {
   const query = new URLSearchParams({ parentId });
   const response = await fetch(buildApiUrl(`/api/v1/sessions/?${query.toString()}`));
   return parseSessionResponse(response);
+}
+
+export async function fetchSessionMessages(sessionId: string) {
+  const response = await fetch(buildApiUrl(`/api/v1/sessions/${sessionId}/messages`));
+
+  if (!response.ok) {
+    throw new Error(`Session messages request failed with status ${response.status}`);
+  }
+
+  return sessionMessageListSchema.parse(await response.json());
 }
 
 async function parseSessionResponse(response: Response) {
