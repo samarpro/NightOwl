@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 from nightowl.channels.base import ChannelBridge
+from nightowl.channels.formatting import markdown_to_whatsapp
 from nightowl.models.approval import ApprovalRequest
 from nightowl.models.message import ChannelMessage
 
@@ -47,12 +48,13 @@ class WhatsAppBridge(ChannelBridge):
         )
 
     async def send_message(self, user_id: str, text: str) -> None:
+        formatted = markdown_to_whatsapp(text)
         to = f"whatsapp:{user_id}" if not user_id.startswith("whatsapp:") else user_id
         from_ = f"whatsapp:{self._from_number}" if not self._from_number.startswith("whatsapp:") else self._from_number
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             None,
-            lambda: self._client.messages.create(to=to, from_=from_, body=text),
+            lambda: self._client.messages.create(to=to, from_=from_, body=formatted),
         )
 
     async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> None:

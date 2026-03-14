@@ -8,6 +8,7 @@ from typing import Any
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 from nightowl.channels.base import ChannelBridge
+from nightowl.channels.formatting import markdown_to_telegram_html
 from nightowl.models.approval import ApprovalRequest
 from nightowl.models.message import ChannelMessage
 
@@ -41,14 +42,15 @@ class TelegramBridge(ChannelBridge):
         )
 
     async def send_message(self, user_id: str, text: str) -> None:
-        await self._bot.send_message(chat_id=user_id, text=text)
+        html = markdown_to_telegram_html(text)
+        await self._bot.send_message(chat_id=user_id, text=html, parse_mode="HTML")
 
     async def send_approval_request(self, user_id: str, approval: ApprovalRequest) -> None:
+        args_str = json.dumps(approval.tool_args, indent=2)
         text = (
-            f"🔒 Approval Required [{approval.risk_level.value.upper()}]\n\n"
-            f"Tool: {approval.tool_name}\n"
-            f"Args: {json.dumps(approval.tool_args)}\n"
-            f"Session: {approval.session_id}"
+            f"🔒 <b>Approval Required</b> [{approval.risk_level.value.upper()}]\n\n"
+            f"<b>Tool:</b> <code>{approval.tool_name}</code>\n"
+            f"<b>Args:</b>\n<pre>{args_str}</pre>"
         )
         keyboard = InlineKeyboardMarkup([
             [
@@ -59,5 +61,6 @@ class TelegramBridge(ChannelBridge):
         await self._bot.send_message(
             chat_id=user_id,
             text=text,
+            parse_mode="HTML",
             reply_markup=keyboard,
         )

@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 from nightowl.channels.base import ChannelBridge
+from nightowl.channels.formatting import markdown_to_plaintext
 from nightowl.models.approval import ApprovalRequest
 from nightowl.models.message import ChannelMessage
 
@@ -45,11 +46,12 @@ class SMSBridge(ChannelBridge):
         )
 
     async def send_message(self, user_id: str, text: str) -> None:
+        formatted = markdown_to_plaintext(text)
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             None,
             lambda: self._client.messages.create(
-                to=user_id, from_=self._from_number, body=text,
+                to=user_id, from_=self._from_number, body=formatted,
             ),
         )
 
