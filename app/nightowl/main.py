@@ -13,6 +13,7 @@ from nightowl.api.routers.approvals import router as approvals_router
 from nightowl.api.routers.health import router as health_router
 from nightowl.api.routers.ingest import router as ingest_router
 from nightowl.api.routers.observability import router as observability_router
+from nightowl.api.routers.shadow import router as shadow_router
 from nightowl.api.routers.skills import router as skills_router
 from nightowl.api.routers.webhooks import router as webhooks_router
 from nightowl.api.routers.websocket import router as websocket_router
@@ -29,6 +30,7 @@ from nightowl.observability.token_store import TokenStore
 from nightowl.sandbox.manager import DockerSandboxManager
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.runner import run_child_session
+from nightowl.sessions.shadow import ShadowManager
 from nightowl.sessions.store import SessionStore
 from nightowl.skills.loader import load_builtin_skills
 from nightowl.skills.store import SkillStore
@@ -83,6 +85,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.skill_store = manager.skill_store
     app.state.token_store = token_store
     app.state.intent_graph = intent_graph
+    app.state.shadow_manager = ShadowManager(manager)
     app.state.ingress_service = ingress_service
 
     yield
@@ -106,6 +109,7 @@ def create_app() -> FastAPI:
     application.include_router(ingest_router)
     application.include_router(approvals_router)
     application.include_router(observability_router)
+    application.include_router(shadow_router)
     application.include_router(skills_router)
     application.include_router(webhooks_router)
     application.include_router(websocket_router)

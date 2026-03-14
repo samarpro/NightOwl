@@ -28,6 +28,7 @@ from nightowl.models.session import Session, SessionRole, SessionState
 from nightowl.sandbox.bash_tool import bash_exec
 from nightowl.sandbox.browser_tool import browser_interact, browser_navigate, browser_screenshot
 from nightowl.sandbox.computer_use_tool import computer_use_action, computer_use_screenshot
+from nightowl.sandbox.file_tools import sandbox_ls, sandbox_read, sandbox_write
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.prompt_builder import build_system_prompt
 from nightowl.sessions.tools import AgentState, sessions_complete, sessions_list, sessions_send, sessions_spawn
@@ -57,7 +58,9 @@ def _is_transient(exc: Exception) -> bool:
     return False
 
 
-def _build_agent(session: Session, system_prompt: str) -> Agent[AgentState, str]:
+def _build_agent(
+    session: Session, system_prompt: str, *, include_tools: bool = True,
+) -> Agent[AgentState, str]:
     model_name = session.model_override or settings.bedrock_model
     provider = BedrockProvider(
         region_name=settings.bedrock_region,
@@ -72,6 +75,9 @@ def _build_agent(session: Session, system_prompt: str) -> Agent[AgentState, str]
         history_processors=[create_compaction_processor()],
     )
 
+    if not include_tools:
+        return agent
+
     if session.role != SessionRole.LEAF:
         agent.tool(sessions_spawn)
         agent.tool(sessions_list)
@@ -84,6 +90,9 @@ def _build_agent(session: Session, system_prompt: str) -> Agent[AgentState, str]
 
     # Sandbox tools — always available; containers are created lazily on first use
     agent.tool(bash_exec)
+    agent.tool(sandbox_read)
+    agent.tool(sandbox_write)
+    agent.tool(sandbox_ls)
     agent.tool(browser_navigate)
     agent.tool(browser_interact)
     agent.tool(browser_screenshot)
