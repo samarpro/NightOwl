@@ -3,6 +3,16 @@ import { z } from "zod";
 export const sessionStatusSchema = z.enum(["running", "waiting", "blocked", "completed"]);
 export const riskLevelSchema = z.enum(["low", "medium", "high"]);
 export const tokenTypeSchema = z.enum(["thinking", "tool_call", "tool_result", "response"]);
+export const channelMessageSchema = z.object({
+  channel: z.string().min(1),
+  sender_id: z.string().min(1),
+  text: z.string().min(1),
+  thread_id: z.string().nullable().optional()
+});
+export const ingestMessageResponseSchema = z.object({
+  sessionId: z.string(),
+  created: z.boolean()
+});
 
 export const sessionNodeSchema = z.object({
   id: z.string(),
@@ -97,6 +107,8 @@ export const dashboardSnapshotSchema = z.object({
 });
 
 export type DashboardSnapshot = z.infer<typeof dashboardSnapshotSchema>;
+export type ChannelMessageDto = z.infer<typeof channelMessageSchema>;
+export type IngestMessageResponseDto = z.infer<typeof ingestMessageResponseSchema>;
 export type SessionNodeDto = z.infer<typeof sessionNodeSchema>;
 export type IntentNodeDto = z.infer<typeof intentNodeSchema>;
 export type ApprovalDto = z.infer<typeof approvalSchema>;

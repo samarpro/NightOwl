@@ -1,3 +1,5 @@
+import { EditorContent, useEditor, type Editor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 
 type SettingsSectionId = "skills-import" | "models";
@@ -33,6 +35,12 @@ type ImportSelection = {
   count: number;
   label: string;
   names: string[];
+};
+
+type SkillEditorAction = {
+  label: string;
+  onClick: (editor: Editor) => void;
+  isActive?: (editor: Editor) => boolean;
 };
 
 const settingsSections: SettingsSection[] = [
@@ -145,6 +153,60 @@ const importCards: ImportCard[] = [
     steps: ["Browse folder tree", "Resolve relative assets", "Show import diff before activation"]
   }
 ];
+
+const skillEditorActions: SkillEditorAction[] = [
+  {
+    label: "H1",
+    onClick: (editor) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+    isActive: (editor) => editor.isActive("heading", { level: 1 })
+  },
+  {
+    label: "H2",
+    onClick: (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+    isActive: (editor) => editor.isActive("heading", { level: 2 })
+  },
+  {
+    label: "Bold",
+    onClick: (editor) => editor.chain().focus().toggleBold().run(),
+    isActive: (editor) => editor.isActive("bold")
+  },
+  {
+    label: "Italic",
+    onClick: (editor) => editor.chain().focus().toggleItalic().run(),
+    isActive: (editor) => editor.isActive("italic")
+  },
+  {
+    label: "Bullet List",
+    onClick: (editor) => editor.chain().focus().toggleBulletList().run(),
+    isActive: (editor) => editor.isActive("bulletList")
+  },
+  {
+    label: "Ordered List",
+    onClick: (editor) => editor.chain().focus().toggleOrderedList().run(),
+    isActive: (editor) => editor.isActive("orderedList")
+  },
+  {
+    label: "Quote",
+    onClick: (editor) => editor.chain().focus().toggleBlockquote().run(),
+    isActive: (editor) => editor.isActive("blockquote")
+  }
+];
+
+const initialSkillDraft = `
+<h1>Custom Skill Draft</h1>
+<p>Describe the custom skill your operators should be able to use.</p>
+<h2>Purpose</h2>
+<p>Summarize what this skill should do and when it should be used.</p>
+<h2>Instructions</h2>
+<ul>
+  <li>State the trigger or user intent.</li>
+  <li>List the steps the skill should follow.</li>
+  <li>Call out any safety or approval requirements.</li>
+</ul>
+<blockquote>
+  <p>Use this draft area to write the content that will later become your SKILL.md instructions.</p>
+</blockquote>
+`;
 
 export function SettingsPage() {
   const [selectedSectionId, setSelectedSectionId] = useState<SettingsSectionId>("skills-import");
@@ -320,6 +382,7 @@ function SkillsImportPanel() {
 
   return (
     <section className="settings-panel-grid">
+      <CustomSkillComposer />
       {importCards.map((card) => (
         <article className="settings-detail-card" key={card.title}>
           <input
@@ -382,6 +445,101 @@ function SkillsImportPanel() {
         </article>
       ))}
     </section>
+  );
+}
+
+function CustomSkillComposer() {
+  const [documentHtml, setDocumentHtml] = useState(initialSkillDraft);
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: initialSkillDraft,
+    immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        "aria-label": "Custom skill editor"
+      }
+    },
+    onUpdate: ({ editor: currentEditor }) => {
+      setDocumentHtml(currentEditor.getHTML());
+    }
+  });
+
+  const documentStats = useMemo(() => {
+    const plainText = editor?.getText().trim() ?? "";
+    const words = plainText.length === 0 ? 0 : plainText.split(/\s+/).length;
+    const blocks = documentHtml
+      .split(/<\/p>|<\/li>|<\/blockquote>/)
+      .map((segment) => segment.replace(/<[^>]+>/g, "").trim())
+      .filter(Boolean).length;
+
+    return {
+      blocks,
+      words
+    };
+  }, [documentHtml, editor]);
+
+  return (
+    <article className="settings-detail-card settings-detail-card--skill-editor">
+      <div className="panel__header settings-detail-card__header">
+        <div>
+          <span className="settings-nav-item__eyebrow">Custom skill draft</span>
+          <h3>Write custom skills directly in the settings workspace.</h3>
+          <p>Use the editor to draft the instructions, role notes, and safety guidance for a new skill.</p>
+        </div>
+        <span className="badge">Tiptap</span>
+      </div>
+
+      <div className="settings-skill-editor">
+        <div className="settings-skill-editor__toolbar" aria-label="Editor formatting">
+          {skillEditorActions.map((action) => (
+            <button
+              className="button button--ghost settings-skill-editor__tool"
+              data-active={editor ? action.isActive?.(editor) ?? false : false}
+              disabled={!editor}
+              key={action.label}
+              onClick={() => {
+                if (editor) {
+                  action.onClick(editor);
+                }
+              }}
+              type="button"
+            >
+              {action.label}
+            </button>
+          ))}
+          <button
+            className="button button--ghost settings-skill-editor__tool"
+            disabled={!editor}
+            onClick={() => {
+              editor?.commands.clearContent();
+              editor?.commands.focus();
+            }}
+            type="button"
+          >
+            Clear
+          </button>
+        </div>
+
+        <EditorContent editor={editor} />
+      </div>
+
+      <div className="settings-skill-editor__footer">
+        <div className="settings-import-selection">
+          <strong>Draft summary</strong>
+          <span>{documentStats.words} words</span>
+          <span>{documentStats.blocks} content blocks</span>
+        </div>
+        <div className="settings-import-selection">
+          <strong>Good skill sections</strong>
+          <div className="settings-import-selection__list">
+            <span className="channel-route-pill">Trigger</span>
+            <span className="channel-route-pill">Workflow</span>
+            <span className="channel-route-pill">Tooling</span>
+            <span className="channel-route-pill">Safety</span>
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 

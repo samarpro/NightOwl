@@ -847,6 +847,96 @@ a {
   gap: 8px;
 }
 
+.settings-detail-card--skill-editor {
+  grid-column: 1 / -1;
+  padding: 0;
+  background:
+    radial-gradient(circle at top right, rgba(212, 108, 61, 0.16), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+}
+
+.settings-skill-editor {
+  display: grid;
+  gap: 14px;
+  padding: 0 18px 18px;
+}
+
+.settings-skill-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-skill-editor__tool {
+  min-width: 0;
+}
+
+.settings-skill-editor__tool[data-active="true"] {
+  border-color: rgba(212, 108, 61, 0.56);
+  background: rgba(212, 108, 61, 0.14);
+  color: var(--text);
+}
+
+.settings-skill-editor .tiptap {
+  min-height: 320px;
+  padding: 18px;
+  border: 1px solid rgba(212, 108, 61, 0.22);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(9, 13, 18, 0.94), rgba(16, 22, 28, 0.92)),
+    linear-gradient(135deg, rgba(212, 108, 61, 0.08), transparent 46%);
+  color: var(--text);
+  line-height: 1.7;
+  outline: none;
+}
+
+.settings-skill-editor .tiptap p,
+.settings-skill-editor .tiptap ul,
+.settings-skill-editor .tiptap ol,
+.settings-skill-editor .tiptap blockquote {
+  margin: 0 0 1rem;
+}
+
+.settings-skill-editor .tiptap h1,
+.settings-skill-editor .tiptap h2 {
+  margin: 0 0 0.8rem;
+  line-height: 1.15;
+}
+
+.settings-skill-editor .tiptap h1 {
+  font-size: 1.55rem;
+}
+
+.settings-skill-editor .tiptap h2 {
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.settings-skill-editor .tiptap ul,
+.settings-skill-editor .tiptap ol {
+  padding-left: 1.2rem;
+}
+
+.settings-skill-editor .tiptap blockquote {
+  border-left: 3px solid rgba(212, 108, 61, 0.42);
+  padding-left: 14px;
+  color: var(--text-soft);
+}
+
+.settings-skill-editor .tiptap:focus-visible {
+  border-color: rgba(212, 108, 61, 0.42);
+  box-shadow: 0 0 0 1px rgba(212, 108, 61, 0.22);
+}
+
+.settings-skill-editor__footer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+
 @keyframes settings-model-active-pulse {
   0%,
   100% {

@@ -12,6 +12,9 @@
   "dependencies": {
     "@tanstack/react-query": "^5.66.9",
     "@tanstack/react-router": "^1.114.12",
+    "@tiptap/pm": "^3.20.1",
+    "@tiptap/react": "^3.20.1",
+    "@tiptap/starter-kit": "^3.20.1",
     "clsx": "^2.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
