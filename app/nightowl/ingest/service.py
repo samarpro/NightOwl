@@ -158,6 +158,11 @@ class IngressService:
                 })
                 continue
 
+            # Trigger intent classification in background
+            intent_graph = getattr(self._manager, "intent_graph", None)
+            if intent_graph:
+                intent_graph.schedule_processing(session.id)
+
             if not output.strip():
                 continue
 

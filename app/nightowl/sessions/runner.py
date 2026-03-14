@@ -21,6 +21,7 @@ logfire.configure(token=settings.logfire_token or None)
 logfire.instrument_pydantic_ai()
 
 from nightowl.composio_tools.meta_tools import composio_execute, composio_search_tools
+from nightowl.observability.token_store import TokenEntry, TokenStore, TokenType
 from nightowl.sessions.context_compaction import create_compaction_processor, truncate_tool_results
 from nightowl.skills.tools import load_skill, read_skill_resource
 from nightowl.models.session import Session, SessionRole, SessionState
@@ -113,26 +114,49 @@ async def _iter_agent(
     if message_history is not None:
         kwargs["message_history"] = message_history
 
+    token_store: TokenStore | None = getattr(deps, "_token_store", None)
+    sid = deps.session_id
+
+    # Capture the prompt as a thinking token
+    if token_store:
+        token_store.append(TokenEntry(session_id=sid, token_type=TokenType.THINKING, content=prompt[:500]))
+
     async with agent.iter(prompt, **kwargs) as agent_run:
         async for node in agent_run:
             if Agent.is_model_request_node(node):
-                await on_event({"type": "node:model_request", "session_id": deps.session_id})
+                await on_event({"type": "node:model_request", "session_id": sid})
             elif Agent.is_call_tools_node(node):
                 tool_parts = [
                     p for p in node.model_response.parts
                     if hasattr(p, "tool_name")
                 ]
+                tools = [p.tool_name for p in tool_parts]
                 await on_event({
                     "type": "node:tool_call",
-                    "session_id": deps.session_id,
-                    "tools": [p.tool_name for p in tool_parts],
+                    "session_id": sid,
+                    "tools": tools,
                 })
+                # Capture tool calls and their args
+                if token_store:
+                    for p in tool_parts:
+                        token_store.append(TokenEntry(
+                            session_id=sid,
+                            token_type=TokenType.TOOL_CALL,
+                            content=p.tool_name,
+                            metadata={"args": p.args_as_json_str()[:1000]},
+                        ))
             elif Agent.is_end_node(node):
-                await on_event({"type": "node:end", "session_id": deps.session_id})
+                await on_event({"type": "node:end", "session_id": sid})
+                # Capture the final response text
+                if token_store and agent_run.result:
+                    text = agent_run.result.output
+                    token_store.append(TokenEntry(
+                        session_id=sid, token_type=TokenType.RESPONSE, content=text[:2000],
+                    ))
 
             # Check for interrupt between nodes
             if interrupt and interrupt.is_set():
-                log.info("Session %s interrupted between nodes", deps.session_id)
+                log.info("Session %s interrupted between nodes", sid)
                 break
 
     output = agent_run.result.output if agent_run.result else ""
@@ -188,6 +212,7 @@ def create_session_runtime(
         store=manager.store, skill_store=getattr(manager, "skill_store", None),
         sandbox_manager=getattr(manager, "sandbox_manager", None),
     )
+    deps._token_store = getattr(manager, "token_store", None)
     return SessionRuntime(agent=agent, deps=deps, message_history=message_history)
 
 
@@ -234,6 +259,7 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
         store=manager.store, skill_store=getattr(manager, "skill_store", None),
         sandbox_manager=getattr(manager, "sandbox_manager", None),
     )
+    deps._token_store = getattr(manager, "token_store", None)
     session.state = SessionState.RUNNING
     await manager._emit({"type": "session:running", "session_id": session.id})
 
@@ -273,6 +299,7 @@ async def run_interactive(
         store=manager.store, skill_store=getattr(manager, "skill_store", None),
         sandbox_manager=getattr(manager, "sandbox_manager", None),
     )
+    deps._token_store = getattr(manager, "token_store", None)
     session.state = SessionState.RUNNING
     message_history: list[Any] = []
 
