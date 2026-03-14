@@ -85,7 +85,7 @@ class TestComposioExecuteLowRisk:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(return_value={"status": "ok"})
             mock_verify.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "Confirmed low"}
@@ -108,7 +108,7 @@ class TestComposioExecuteLowRisk:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(return_value={"status": "ok"})
             mock_verify.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "Confirmed low"}
@@ -132,7 +132,7 @@ class TestComposioExecuteLowRisk:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(return_value={"status": "ok"})
             mock_verify.return_value = {"verified_risk": RiskLevel.HIGH, "reasoning": "This drops a table"}
@@ -161,7 +161,7 @@ class TestComposioExecuteMediumRisk:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(return_value={"status": "ok"})
             mock_verify.return_value = {"verified_risk": RiskLevel.MEDIUM, "reasoning": "Correct"}
@@ -184,7 +184,7 @@ class TestComposioExecuteMediumRisk:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(return_value={"status": "ok"})
             mock_verify.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "False positive"}
@@ -208,7 +208,7 @@ class TestComposioExecuteMediumRisk:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(return_value={"status": "ok"})
             mock_verify.return_value = {"verified_risk": RiskLevel.HIGH, "reasoning": "Actually sends money"}
@@ -238,7 +238,7 @@ class TestComposioExecuteHighRisk:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(return_value={"status": "ok"})
             await composio_execute(
@@ -300,7 +300,7 @@ class TestComposioExecuteHighRisk:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(return_value={"status": "ok"})
             await composio_execute(
@@ -328,7 +328,7 @@ class TestComposioExecuteParams:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(return_value={"status": "ok"})
             mock_verify.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
@@ -349,7 +349,7 @@ class TestComposioExecuteParams:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(return_value={"status": "ok"})
             mock_verify.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
@@ -371,7 +371,7 @@ class TestComposioExecuteParams:
 
         with (
             patch("nightowl.composio_tools.meta_tools._get_composio_client") as mock_client,
-            patch("nightowl.hitl.decorator.verify_risk") as mock_verify,
+            patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify,
         ):
             mock_client.return_value.execute_tool = AsyncMock(
                 side_effect=Exception("Tool execution failed")

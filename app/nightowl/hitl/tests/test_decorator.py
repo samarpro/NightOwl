@@ -79,7 +79,7 @@ class TestRiskParamExtraction:
             return "ok"
 
         ctx = await _make_ctx_with_gate(manager)
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock:
             mock.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
             await capture_tool(ctx, query="test", risk_level="low", risk_justification="safe")
 
@@ -90,7 +90,7 @@ class TestRiskParamExtraction:
     async def test_defaults_to_low_when_risk_level_omitted(self, manager: SessionManager):
         """If the LLM doesn't provide risk_level, it should default to 'low'."""
         ctx = await _make_ctx_with_gate(manager)
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock:
             mock.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
             result = await _dummy_tool(ctx, query="hello")
 
@@ -109,21 +109,21 @@ class TestRiskLevelParsing:
             ctx = await _make_ctx_with_gate(manager, gate=MagicMock(
                 request_approval=AsyncMock(return_value=True),
             ))
-            with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock:
+            with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock:
                 mock.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
                 result = await _dummy_tool(ctx, risk_level=risk, risk_justification="test")
             assert "executed" in result or "Error" not in result
 
     async def test_uppercase_risk_level_accepted(self, manager: SessionManager):
         ctx = await _make_ctx_with_gate(manager)
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock:
             mock.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
             result = await _dummy_tool(ctx, risk_level="LOW", risk_justification="safe")
         assert "executed" in result
 
     async def test_whitespace_risk_level_accepted(self, manager: SessionManager):
         ctx = await _make_ctx_with_gate(manager)
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock:
             mock.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
             result = await _dummy_tool(ctx, risk_level="  medium  ", risk_justification="")
         # Should not error on whitespace
@@ -154,7 +154,7 @@ class TestHighCriticalSkipsClassifier:
         gate = MagicMock(request_approval=AsyncMock(return_value=True))
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
-        with patch("nightowl.hitl.decorator.verify_risk") as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify:
             await _dummy_tool(ctx, risk_level="high", risk_justification="dangerous")
 
         mock_verify.assert_not_called()
@@ -163,7 +163,7 @@ class TestHighCriticalSkipsClassifier:
         gate = MagicMock(request_approval=AsyncMock(return_value=True))
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
-        with patch("nightowl.hitl.decorator.verify_risk") as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk") as mock_verify:
             await _dummy_tool(ctx, risk_level="critical", risk_justification="payment")
 
         mock_verify.assert_not_called()
@@ -172,7 +172,7 @@ class TestHighCriticalSkipsClassifier:
         gate = MagicMock(request_approval=AsyncMock(return_value=True))
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
-        with patch("nightowl.hitl.decorator.verify_risk"):
+        with patch("nightowl.hitl.decorator._default_verify_risk"):
             await _dummy_tool(ctx, risk_level="high", risk_justification="send email")
 
         gate.request_approval.assert_called_once()
@@ -181,7 +181,7 @@ class TestHighCriticalSkipsClassifier:
         gate = MagicMock(request_approval=AsyncMock(return_value=True))
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
-        with patch("nightowl.hitl.decorator.verify_risk"):
+        with patch("nightowl.hitl.decorator._default_verify_risk"):
             await _dummy_tool(ctx, risk_level="critical", risk_justification="delete data")
 
         gate.request_approval.assert_called_once()
@@ -196,7 +196,7 @@ class TestLowMediumRunsClassifier:
     async def test_low_risk_runs_classifier(self, manager: SessionManager):
         ctx = await _make_ctx_with_gate(manager)
 
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
             mock_verify.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
             await _dummy_tool(ctx, risk_level="low", risk_justification="read-only")
 
@@ -206,7 +206,7 @@ class TestLowMediumRunsClassifier:
         gate = MagicMock(request_approval=AsyncMock(return_value=True))
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
             mock_verify.return_value = {"verified_risk": RiskLevel.MEDIUM, "reasoning": "ok"}
             await _dummy_tool(ctx, risk_level="medium", risk_justification="create event")
 
@@ -215,7 +215,7 @@ class TestLowMediumRunsClassifier:
     async def test_classifier_receives_tool_name(self, manager: SessionManager):
         ctx = await _make_ctx_with_gate(manager)
 
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
             mock_verify.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
             await _dummy_tool(ctx, risk_level="low", risk_justification="test")
 
@@ -225,7 +225,7 @@ class TestLowMediumRunsClassifier:
     async def test_classifier_receives_tool_kwargs(self, manager: SessionManager):
         ctx = await _make_ctx_with_gate(manager)
 
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
             mock_verify.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
             await _dummy_tool(ctx, query="find restaurants", risk_level="low", risk_justification="")
 
@@ -243,7 +243,7 @@ class TestClassifierUpgradeTriggersGate:
         gate = MagicMock(request_approval=AsyncMock(return_value=True))
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
             mock_verify.return_value = {"verified_risk": RiskLevel.HIGH, "reasoning": "actually sends money"}
             await _dummy_tool(ctx, risk_level="low", risk_justification="safe")
 
@@ -253,7 +253,7 @@ class TestClassifierUpgradeTriggersGate:
         gate = MagicMock(request_approval=AsyncMock(return_value=True))
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
             mock_verify.return_value = {"verified_risk": RiskLevel.MEDIUM, "reasoning": "creates data"}
             await _dummy_tool(ctx, risk_level="low", risk_justification="safe")
 
@@ -263,7 +263,7 @@ class TestClassifierUpgradeTriggersGate:
         gate = MagicMock(request_approval=AsyncMock(return_value=True))
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
             mock_verify.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "read-only"}
             await _dummy_tool(ctx, risk_level="low", risk_justification="safe")
 
@@ -376,7 +376,7 @@ class TestNoGateConfigured:
         """LOW risk doesn't need a gate, so missing gate shouldn't block it."""
         ctx = await _make_ctx_with_gate(manager, gate=None)
 
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
             mock_verify.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "safe"}
             result = await _dummy_tool(ctx, query="search", risk_level="low")
 
@@ -394,7 +394,7 @@ class TestClassifierFailure:
         gate = MagicMock(request_approval=AsyncMock(return_value=True))
         ctx = await _make_ctx_with_gate(manager, gate=gate)
 
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
             mock_verify.side_effect = Exception("Bedrock down")
             result = await _dummy_tool(ctx, risk_level="medium", risk_justification="test")
 
@@ -406,7 +406,7 @@ class TestClassifierFailure:
         """Classifier failure on LOW risk should still let the tool run."""
         ctx = await _make_ctx_with_gate(manager, gate=None)
 
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock_verify:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock_verify:
             mock_verify.side_effect = Exception("Bedrock down")
             result = await _dummy_tool(ctx, query="search", risk_level="low")
 
@@ -426,7 +426,7 @@ class TestToolErrors:
             raise RuntimeError("connection lost")
 
         ctx = await _make_ctx_with_gate(manager)
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock:
             mock.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
             result = await broken_tool(ctx, risk_level="low")
 
@@ -439,7 +439,7 @@ class TestToolErrors:
             raise ValueError("boom")
 
         ctx = await _make_ctx_with_gate(manager)
-        with patch("nightowl.hitl.decorator.verify_risk", new_callable=AsyncMock) as mock:
+        with patch("nightowl.hitl.decorator._default_verify_risk", new_callable=AsyncMock) as mock:
             mock.return_value = {"verified_risk": RiskLevel.LOW, "reasoning": "ok"}
             # Must not raise — decorator catches it
             result = await exploding_tool(ctx, risk_level="low")
