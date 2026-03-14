@@ -18,7 +18,9 @@ FastAPI routers that expose NightOwl's HTTP and WebSocket interface. All routes 
 
 ### Webhooks (`routers/webhooks.py`)
 
-`POST /api/v1/channels/telegram/webhook` — Telegram Bot API webhook endpoint. Validates the secret token header, normalizes the inbound message via the Telegram bridge, and forwards to the `IngressService`. Additional channel webhooks (WhatsApp, SMS) will follow the same pattern.
+`POST /api/v1/channels/telegram/webhook` — Telegram Bot API webhook endpoint. Validates the secret token header, handles two payload types: regular messages (normalized and forwarded to `IngressService`) and callback queries (inline keyboard button presses for HITL approve/reject, resolved directly via the gate). Answers callback queries to clear Telegram's loading spinner.
+
+`GET /api/v1/composio/auth/callback` — Composio redirects here when a user completes an OAuth flow. Resolves the pending `AuthWaiter` event so the blocked tool execution can retry.
 
 ### WebSocket (`routers/websocket.py`)
 

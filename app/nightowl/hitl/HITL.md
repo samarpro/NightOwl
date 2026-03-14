@@ -23,7 +23,7 @@ The `@hitl_gated` decorator wraps any Pydantic AI tool function. It intercepts t
 
 ### Classifier (`classifier.py`)
 
-Calls Claude Haiku via Bedrock to verify the agent's self-reported risk. Receives the tool name, args, reported risk, and justification. Returns a verified risk level with reasoning. Falls back to the self-reported risk on any error — the system degrades to trusting the agent rather than blocking all actions.
+Calls Claude Haiku via Bedrock to verify the agent's self-reported risk. Uses a typed `RiskVerification` Pydantic output model for structured responses. Receives the tool name, args, reported risk, and justification. Returns a verified risk level with reasoning. Falls back to the self-reported risk on any error — the system degrades to trusting the agent rather than blocking all actions.
 
 ### Gate (`gate.py`)
 
@@ -31,8 +31,9 @@ Calls Claude Haiku via Bedrock to verify the agent's self-reported risk. Receive
 
 1. Creates a pending approval with a unique ID and expiry timestamp
 2. Broadcasts `approval:required` via the event bus (picked up by dashboard WebSocket and CLI)
-3. Looks up the session's channel via the `ChannelRegistry` and sends an inline approval request through the appropriate bridge (Telegram inline keyboard, WhatsApp/SMS text prompt)
-4. Blocks on an `asyncio.Event` until resolved or timeout
-5. First response wins — dashboard, WebSocket, and channel race; whichever responds first takes effect
+3. Resolves the session's channel — walks up the parent chain if the approval originates from a child session, so child HITL requests reach the user's messaging app
+4. Sends an inline approval request through the appropriate bridge (Telegram inline keyboard, WhatsApp/SMS text prompt)
+5. Blocks on an `asyncio.Event` until resolved or timeout
+6. First response wins — dashboard, WebSocket, Telegram callback query, and channel all race; whichever responds first takes effect
 
 The gate is shared across all sessions via the `SessionManager` and receives the `ChannelRegistry` at construction time.
