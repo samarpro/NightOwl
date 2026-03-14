@@ -21,6 +21,7 @@ class AgentState:
     hitl_gate: Any = None  # Optional HITLGate instance
     channel_registry: Any = None  # Optional ChannelRegistry instance
     store: Any = None  # Optional SessionStore instance
+    skill_store: Any = None  # Optional SkillStore instance
     mcp_servers: list[Any] = field(default_factory=list)
     sandbox_manager: Any = None  # Optional DockerSandboxManager instance
 

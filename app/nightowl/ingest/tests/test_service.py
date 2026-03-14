@@ -21,7 +21,7 @@ async def _fake_process(runtime: _FakeRuntime, message: str, on_event):
     return f"echo:{message}"
 
 
-def _fake_runtime_factory(session, manager, message_history=None):
+def _fake_runtime_factory(session, manager, message_history=None, skills_prompt=None):
     return _FakeRuntime(session.id)
 
 

@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from nightowl.api.routers.approvals import router as approvals_router
 from nightowl.api.routers.health import router as health_router
 from nightowl.api.routers.ingest import router as ingest_router
+from nightowl.api.routers.skills import router as skills_router
 from nightowl.api.routers.webhooks import router as webhooks_router
 from nightowl.api.routers.websocket import router as websocket_router
 from nightowl.channels.base import ChannelRegistry
@@ -25,6 +26,8 @@ from nightowl.sandbox.manager import DockerSandboxManager
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.runner import run_child_session
 from nightowl.sessions.store import SessionStore
+from nightowl.skills.loader import load_builtin_skills
+from nightowl.skills.store import SkillStore
 
 
 @asynccontextmanager
@@ -50,7 +53,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     manager.hitl_gate = gate
     manager.channel_registry = registry
     manager.sandbox_manager = DockerSandboxManager()
+    manager.skill_store = SkillStore(session_factory)
 
+    await load_builtin_skills(manager.skill_store)
     ingress_service = IngressService(manager=manager, registry=registry)
 
     # Resume active session from DB if one exists
@@ -64,6 +69,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.manager = manager
     app.state.hitl_gate = gate
     app.state.channel_registry = registry
+    app.state.skill_store = manager.skill_store
     app.state.ingress_service = ingress_service
 
     yield
@@ -85,6 +91,7 @@ def create_app() -> FastAPI:
     application.include_router(health_router)
     application.include_router(ingest_router)
     application.include_router(approvals_router)
+    application.include_router(skills_router)
     application.include_router(webhooks_router)
     application.include_router(websocket_router)
     return application

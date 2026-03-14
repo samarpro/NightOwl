@@ -15,6 +15,7 @@ from nightowl.models.message import ChannelMessage
 from nightowl.models.session import Session, SessionState
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.runner import SessionRuntime, create_session_runtime, process_runtime_message
+from nightowl.skills.tools import format_skills_for_prompt
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ class IngressService:
             "text": message.text,
         })
 
-        self._ensure_worker(session)
+        await self._ensure_worker(session)
         await self._manager.send_to_session(session.id, message.text)
         return IngestResult(session_id=session.id, created=created)
 
@@ -115,7 +116,7 @@ class IngressService:
         self._restored_history = None
         return session, True
 
-    def _ensure_worker(self, session: Session) -> None:
+    async def _ensure_worker(self, session: Session) -> None:
         current = self._workers.get(session.id)
         if current and not current.task.done():
             return
@@ -124,7 +125,16 @@ class IngressService:
         history = self._restored_history
         self._restored_history = None  # consumed
 
-        runtime = self._runtime_factory(session, self._manager, message_history=history)
+        # Load tier 1 skill metadata for the system prompt
+        skills_prompt = None
+        skill_store = getattr(self._manager, "skill_store", None)
+        if skill_store:
+            skills = await skill_store.list_skills()
+            skills_prompt = format_skills_for_prompt(skills) or None
+
+        runtime = self._runtime_factory(
+            session, self._manager, message_history=history, skills_prompt=skills_prompt,
+        )
         task = asyncio.create_task(self._session_worker(session, runtime), name=f"ingress:{session.id}")
         self._workers[session.id] = _WorkerState(runtime=runtime, task=task)
 

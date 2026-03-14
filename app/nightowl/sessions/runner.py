@@ -22,6 +22,7 @@ logfire.instrument_pydantic_ai()
 
 from nightowl.composio_tools.meta_tools import composio_execute, composio_search_tools
 from nightowl.sessions.context_compaction import create_compaction_processor, truncate_tool_results
+from nightowl.skills.tools import load_skill, read_skill_resource
 from nightowl.models.session import Session, SessionRole, SessionState
 from nightowl.sandbox.bash_tool import bash_exec
 from nightowl.sandbox.browser_tool import browser_interact, browser_navigate, browser_screenshot
@@ -77,6 +78,8 @@ def _build_agent(session: Session, system_prompt: str) -> Agent[AgentState, str]
     agent.tool(sessions_send)
     agent.tool(composio_search_tools)
     agent.tool(composio_execute)
+    agent.tool(load_skill)
+    agent.tool(read_skill_resource)
 
     # Sandbox tools — always available; containers are created lazily on first use
     agent.tool(bash_exec)
@@ -173,14 +176,16 @@ async def process_message(
 
 
 def create_session_runtime(
-    session: Session, manager: SessionManager, message_history: list[Any] | None = None,
+    session: Session, manager: SessionManager,
+    message_history: list[Any] | None = None,
+    skills_prompt: str | None = None,
 ) -> SessionRuntime:
-    system_prompt = build_system_prompt(session)
+    system_prompt = build_system_prompt(session, skills_prompt=skills_prompt)
     agent = _build_agent(session, system_prompt)
     deps = AgentState(
         session_id=session.id, manager=manager,
         hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry,
-        store=manager.store,
+        store=manager.store, skill_store=getattr(manager, "skill_store", None),
         sandbox_manager=getattr(manager, "sandbox_manager", None),
     )
     return SessionRuntime(agent=agent, deps=deps, message_history=message_history)
@@ -226,7 +231,7 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
     deps = AgentState(
         session_id=session.id, manager=manager,
         hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry,
-        store=manager.store,
+        store=manager.store, skill_store=getattr(manager, "skill_store", None),
         sandbox_manager=getattr(manager, "sandbox_manager", None),
     )
     session.state = SessionState.RUNNING
@@ -265,7 +270,7 @@ async def run_interactive(
     deps = AgentState(
         session_id=session.id, manager=manager,
         hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry,
-        store=manager.store,
+        store=manager.store, skill_store=getattr(manager, "skill_store", None),
         sandbox_manager=getattr(manager, "sandbox_manager", None),
     )
     session.state = SessionState.RUNNING
