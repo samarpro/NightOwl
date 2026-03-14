@@ -5,7 +5,7 @@ from __future__ import annotations
 import hmac
 import logging
 
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, Form, HTTPException, Header, Request
 
 from nightowl.composio_tools.meta_tools import auth_waiter
 from nightowl.config import settings
@@ -86,6 +86,58 @@ async def _handle_telegram_callback(request: Request, callback_query: dict) -> d
             log.debug("Failed to answer callback query", exc_info=True)
 
     return {"ok": True, "handled": True}
+
+
+# ── WhatsApp (Twilio) ─────────────────────────────────────────────
+
+
+@router.post("/channels/whatsapp/webhook")
+async def whatsapp_webhook(
+    request: Request,
+    From: str = Form(...),
+    Body: str = Form(""),
+    MessageSid: str = Form(""),
+    To: str = Form(""),
+    NumMedia: str = Form("0"),
+) -> str:
+    """Twilio sends WhatsApp webhooks as form-encoded POST."""
+    log.debug("WhatsApp webhook from %s: %s", From, Body)
+
+    registry = request.app.state.channel_registry
+    bridge = registry.get("whatsapp")
+    if bridge is None:
+        raise HTTPException(status_code=503, detail="WhatsApp bridge not configured")
+
+    # Check if this is an approval reply
+    body_upper = Body.strip().upper()
+    if body_upper.startswith("APPROVE ") or body_upper.startswith("REJECT "):
+        return await _handle_whatsapp_approval(request, Body.strip())
+
+    raw = {"From": From, "Body": Body, "MessageSid": MessageSid, "To": To, "NumMedia": NumMedia}
+    channel_message = bridge.normalize_inbound(raw)
+    result = await request.app.state.ingress_service.ingest(channel_message)
+
+    # Twilio expects TwiML response (empty is fine for no auto-reply)
+    return "<Response></Response>"
+
+
+async def _handle_whatsapp_approval(request: Request, text: str) -> str:
+    """Parse 'APPROVE <id>' or 'REJECT <id>' from WhatsApp replies."""
+    parts = text.split(maxsplit=1)
+    if len(parts) < 2:
+        return "<Response></Response>"
+
+    action, approval_id = parts[0].upper(), parts[1]
+    gate = request.app.state.hitl_gate
+
+    if action == "APPROVE":
+        gate.resolve_approval(approval_id, approved=True, reason="Approved via WhatsApp")
+        log.info("Approval %s approved via WhatsApp", approval_id)
+    elif action == "REJECT":
+        gate.resolve_approval(approval_id, approved=False, reason="Rejected via WhatsApp")
+        log.info("Approval %s rejected via WhatsApp", approval_id)
+
+    return "<Response></Response>"
 
 
 # ── Composio auth callback ────────────────────────────────────────

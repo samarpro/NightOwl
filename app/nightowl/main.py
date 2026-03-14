@@ -17,6 +17,7 @@ from nightowl.api.routers.webhooks import router as webhooks_router
 from nightowl.api.routers.websocket import router as websocket_router
 from nightowl.channels.base import ChannelRegistry
 from nightowl.channels.telegram import TelegramBridge
+from nightowl.channels.whatsapp import WhatsAppBridge
 from nightowl.config import settings
 from nightowl.db import close_db, init_db
 from nightowl.events import RuntimeBroadcaster
@@ -48,6 +49,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     registry = ChannelRegistry()
     if settings.telegram_bot_token:
         registry.register(TelegramBridge())
+    if settings.twilio_account_sid and settings.twilio_auth_token:
+        registry.register(WhatsAppBridge())
 
     gate = HITLGate(manager=manager, event_bus=broadcaster, registry=registry)
     manager.hitl_gate = gate
