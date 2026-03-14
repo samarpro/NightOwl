@@ -6,14 +6,19 @@ import asyncio
 import logging
 from typing import Any
 
+import logfire
 from pydantic_ai import Agent
 from pydantic_ai.models.bedrock import BedrockConverseModel
 from pydantic_ai.providers.bedrock import BedrockProvider
 
 from nightowl.config import settings
+
+logfire.configure(token=settings.logfire_token or None)
+logfire.instrument_pydantic_ai()
 from nightowl.models.session import Session, SessionRole, SessionState
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.prompt_builder import build_system_prompt
+from nightowl.composio_tools.meta_tools import composio_execute, composio_search_tools
 from nightowl.sessions.tools import AgentState, sessions_list, sessions_send, sessions_spawn
 
 log = logging.getLogger(__name__)
@@ -39,7 +44,16 @@ def _build_agent(session: Session, system_prompt: str) -> Agent[AgentState, str]
         agent.tool(sessions_list)
     agent.tool(sessions_send)
 
+    # Composio tools — available to all roles
+    agent.tool(composio_search_tools)
+    agent.tool(composio_execute)
+
     return agent
+
+
+async def run_child_session(session: Session, manager: SessionManager) -> None:
+    """Entry point for background child sessions. Uses the session's task as the initial message."""
+    await run_session(session, manager, session.task)
 
 
 async def run_session(

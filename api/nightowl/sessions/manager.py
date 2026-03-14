@@ -26,6 +26,12 @@ class SessionManager:
         self._sessions: dict[str, Session] = {}
         self._queues: dict[str, asyncio.Queue[Any]] = {}
         self._broadcast: asyncio.Queue[dict[str, Any]] | None = None
+        self._child_runner: Any | None = None  # async callable(Session, SessionManager)
+        self._background_tasks: set[asyncio.Task[Any]] = set()
+
+    def set_child_runner(self, runner: Any) -> None:
+        """Set the coroutine used to execute child sessions in the background."""
+        self._child_runner = runner
 
     def set_broadcast_queue(self, q: asyncio.Queue[dict[str, Any]]) -> None:
         self._broadcast = q
@@ -95,7 +101,24 @@ class SessionManager:
             {"type": "session:spawned", "parent": parent_id, "child": child.model_dump()}
         )
         log.info("Spawned child %s (depth=%d, role=%s) from %s", session_id, child_depth, child_role, parent_id)
+
+        # Kick off the child session as a background task
+        if self._child_runner is not None:
+            task = asyncio.create_task(
+                self._run_child_safe(child), name=f"child:{session_id}",
+            )
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+
         return child
+
+    async def _run_child_safe(self, child: Session) -> None:
+        """Run a child session, catching errors and completing as failed."""
+        try:
+            await self._child_runner(child, self)
+        except Exception:
+            log.exception("Child session %s failed", child.id)
+            await self.complete_session(child.id, "Child session crashed", success=False)
 
     # ── Session lifecycle ─────────────────────────────────────────
 
