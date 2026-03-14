@@ -148,6 +148,7 @@ const importCards: ImportCard[] = [
 
 export function SettingsPage() {
   const [selectedSectionId, setSelectedSectionId] = useState<SettingsSectionId>("skills-import");
+  const [activeModelName, setActiveModelName] = useState("GPT-5 Codex");
   const selectedSection = useMemo(
     () => settingsSections.find((section) => section.id === selectedSectionId) ?? settingsSections[0],
     [selectedSectionId],
@@ -221,7 +222,11 @@ export function SettingsPage() {
                 ))}
               </section>
 
-              {selectedSection.id === "models" ? <ModelsPanel /> : <SkillsImportPanel />}
+              {selectedSection.id === "models" ? (
+                <ModelsPanel activeModelName={activeModelName} onUseModel={setActiveModelName} />
+              ) : (
+                <SkillsImportPanel />
+              )}
             </div>
           </section>
         </div>
@@ -230,17 +235,29 @@ export function SettingsPage() {
   );
 }
 
-function ModelsPanel() {
+function ModelsPanel({
+  activeModelName,
+  onUseModel
+}: {
+  activeModelName: string;
+  onUseModel: (modelName: string) => void;
+}) {
   return (
     <section className="settings-panel-grid settings-panel-grid--models">
       {modelCards.map((model) => (
-        <article className="settings-detail-card settings-detail-card--model" key={model.name}>
+        <article
+          className="settings-detail-card settings-detail-card--model"
+          data-active={model.name === activeModelName}
+          key={model.name}
+        >
           <div className="settings-model-card__top">
             <div>
               <span className="settings-model-card__provider">{model.provider}</span>
               <h3>{model.name}</h3>
             </div>
-            <span className="badge badge--channel badge--active">{model.badge}</span>
+            <span className={`badge badge--channel ${model.name === activeModelName ? "badge--active" : ""}`}>
+              {model.name === activeModelName ? "In use" : model.badge}
+            </span>
           </div>
           <p className="settings-model-card__summary">{model.summary}</p>
           <div className="settings-model-card__capabilities">
@@ -249,6 +266,16 @@ function ModelsPanel() {
                 {capability}
               </span>
             ))}
+          </div>
+          <div className="settings-model-card__actions">
+            <button
+              className={model.name === activeModelName ? "button button--ghost" : "button button--primary"}
+              disabled={model.name === activeModelName}
+              onClick={() => onUseModel(model.name)}
+              type="button"
+            >
+              {model.name === activeModelName ? "Current model" : "Use"}
+            </button>
           </div>
         </article>
       ))}

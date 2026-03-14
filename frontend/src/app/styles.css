@@ -739,6 +739,20 @@ a {
   gap: 14px;
   padding: 18px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(212, 108, 61, 0.04));
+  transition:
+    transform 180ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    background 220ms ease;
+}
+
+.settings-detail-card--model[data-active="true"] {
+  border-color: rgba(89, 196, 141, 0.64);
+  box-shadow:
+    0 0 0 1px rgba(89, 196, 141, 0.2),
+    0 18px 38px rgba(0, 0, 0, 0.22);
+  background: linear-gradient(180deg, rgba(89, 196, 141, 0.14), rgba(255, 255, 255, 0.04));
+  animation: settings-model-active-pulse 2.4s ease-in-out infinite;
 }
 
 .settings-detail-card__header {
@@ -797,6 +811,11 @@ a {
   gap: 8px;
 }
 
+.settings-model-card__actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .settings-import-actions {
   display: flex;
   gap: 10px;
@@ -826,6 +845,23 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+@keyframes settings-model-active-pulse {
+  0%,
+  100% {
+    transform: translateY(0);
+    box-shadow:
+      0 0 0 1px rgba(89, 196, 141, 0.2),
+      0 18px 38px rgba(0, 0, 0, 0.22);
+  }
+
+  50% {
+    transform: translateY(-2px);
+    box-shadow:
+      0 0 0 1px rgba(89, 196, 141, 0.34),
+      0 24px 44px rgba(0, 0, 0, 0.26);
+  }
 }
 
 .channel-section {
