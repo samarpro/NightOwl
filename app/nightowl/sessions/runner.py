@@ -21,7 +21,11 @@ logfire.configure(token=settings.logfire_token or None)
 logfire.instrument_pydantic_ai()
 
 from nightowl.composio_tools.meta_tools import composio_execute, composio_search_tools
-from nightowl.models.session import Session, SessionRole, SessionState
+from nightowl.sessions.context_compaction import create_compaction_processor, truncate_tool_results
+from nightowl.models.session import SandboxMode, Session, SessionRole, SessionState
+from nightowl.sandbox.bash_tool import bash_exec
+from nightowl.sandbox.browser_tool import browser_interact, browser_navigate, browser_screenshot
+from nightowl.sandbox.computer_use_tool import computer_use_action, computer_use_screenshot
 from nightowl.sessions.manager import SessionManager
 from nightowl.sessions.prompt_builder import build_system_prompt
 from nightowl.sessions.tools import AgentState, sessions_complete, sessions_list, sessions_send, sessions_spawn
@@ -63,6 +67,7 @@ def _build_agent(session: Session, system_prompt: str) -> Agent[AgentState, str]
         system_prompt=system_prompt,
         deps_type=AgentState,
         retries=2,
+        history_processors=[create_compaction_processor()],
     )
 
     if session.role != SessionRole.LEAF:
@@ -72,6 +77,20 @@ def _build_agent(session: Session, system_prompt: str) -> Agent[AgentState, str]
     agent.tool(sessions_send)
     agent.tool(composio_search_tools)
     agent.tool(composio_execute)
+
+    # Sandbox tools — registered based on the session's sandbox mode
+    mode = session.sandbox_mode
+    if mode == SandboxMode.CLI:
+        agent.tool(bash_exec)
+    elif mode == SandboxMode.BROWSER:
+        agent.tool(bash_exec)
+        agent.tool(browser_navigate)
+        agent.tool(browser_interact)
+        agent.tool(browser_screenshot)
+    elif mode == SandboxMode.COMPUTER:
+        agent.tool(bash_exec)
+        agent.tool(computer_use_screenshot)
+        agent.tool(computer_use_action)
 
     return agent
 
@@ -168,6 +187,7 @@ def create_session_runtime(
         session_id=session.id, manager=manager,
         hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry,
         store=manager.store,
+        sandbox_manager=getattr(manager, "sandbox_manager", None),
     )
     return SessionRuntime(agent=agent, deps=deps, message_history=message_history)
 
@@ -209,7 +229,12 @@ async def run_child_session(session: Session, manager: SessionManager) -> None:
     """
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
-    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry, store=manager.store)
+    deps = AgentState(
+        session_id=session.id, manager=manager,
+        hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry,
+        store=manager.store,
+        sandbox_manager=getattr(manager, "sandbox_manager", None),
+    )
     session.state = SessionState.RUNNING
     await manager._emit({"type": "session:running", "session_id": session.id})
 
@@ -243,7 +268,12 @@ async def run_interactive(
     session = await manager.create_main_session("interactive")
     system_prompt = build_system_prompt(session)
     agent = _build_agent(session, system_prompt)
-    deps = AgentState(session_id=session.id, manager=manager, hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry, store=manager.store)
+    deps = AgentState(
+        session_id=session.id, manager=manager,
+        hitl_gate=manager.hitl_gate, channel_registry=manager.channel_registry,
+        store=manager.store,
+        sandbox_manager=getattr(manager, "sandbox_manager", None),
+    )
     session.state = SessionState.RUNNING
     message_history: list[Any] = []
 
