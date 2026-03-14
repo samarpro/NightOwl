@@ -90,6 +90,17 @@ def translate_runtime_event(raw: dict[str, Any]) -> RuntimeEvent | None:
             payload=serialize_session(child),
         )
 
+    if raw_type == "session:cleared":
+        return RuntimeEvent(
+            event_id=f"event:{uuid.uuid4().hex[:12]}",
+            event_type="session.cleared",
+            occurred_at=datetime.now(UTC),
+            session_id=raw.get("session_id"),
+            payload={
+                "sessionId": raw.get("session_id"),
+            },
+        )
+
     if raw_type == "channel:message_received":
         return RuntimeEvent(
             event_id=f"event:{uuid.uuid4().hex[:12]}",

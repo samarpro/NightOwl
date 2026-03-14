@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import TypeAdapter
 from pydantic_ai.messages import ModelMessage
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from nightowl.db import ChatMessageRow, SessionRow
@@ -99,6 +99,16 @@ class SessionStore:
             messages.append(msg)
         log.debug("Loaded %d messages for session %s", len(messages), session_id)
         return messages
+
+    async def clear_messages(self, session_id: str) -> int:
+        """Delete all chat messages for a session. Returns count deleted."""
+        async with self._sf() as db:
+            stmt = delete(ChatMessageRow).where(ChatMessageRow.session_id == session_id)
+            result = await db.execute(stmt)
+            await db.commit()
+            count = result.rowcount
+        log.info("Cleared %d messages for session %s", count, session_id)
+        return count
 
     async def load_active_main_session(self) -> tuple[Session, list[ModelMessage]] | None:
         async with self._sf() as db:

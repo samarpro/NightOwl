@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from nightowl.channels.base import ChannelRegistry
+from nightowl.ingest.commands import handle_command
 from nightowl.models.message import ChannelMessage
 from nightowl.models.session import Session, SessionState
 from nightowl.sessions.manager import SessionManager
@@ -83,6 +84,24 @@ class IngressService:
             redirected = self._manager.hitl_gate.consume_redirect_instruction(session.id, message.text)
             if redirected is not None:
                 inbound_text = redirected
+
+        # Slash commands — intercept before reaching the agent
+        cmd_result = await handle_command(
+            inbound_text, session.id, self._manager, self._workers,
+        )
+        if cmd_result is not None:
+            if cmd_result.reply:
+                await self._registry.send_session_reply(session.id, cmd_result.reply)
+                await self._manager._emit({
+                    "type": "agent:response",
+                    "session_id": session.id,
+                    "channel": message.channel,
+                    "text": cmd_result.reply,
+                })
+            if cmd_result.end_session:
+                self._main_session_id = None
+                self._restored_history = None
+            return IngestResult(session_id=session.id, created=created)
 
         await self._ensure_worker(session)
         await self._manager.send_to_session(session.id, inbound_text)
