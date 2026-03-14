@@ -20,6 +20,16 @@ async def list_sessions(
     return await store.list_child_sessions(parent_id)
 
 
+@router.get("/{session_id}/descendants")
+async def list_descendants(
+    session_id: str,
+    request: Request,
+) -> list[dict[str, Any]]:
+    """Return full subtree of descendants for a root session."""
+    store = request.app.state.manager.store
+    return await store.list_descendants(session_id)
+
+
 @router.get("/{session_id}/messages")
 async def get_session_messages(
     session_id: str,

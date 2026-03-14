@@ -11,6 +11,7 @@ export function DashboardShell() {
   const {
     childSessions,
     childSessionsError,
+    descendants,
     isLoading,
     liveChannels,
     pendingApprovals,
@@ -86,9 +87,9 @@ export function DashboardShell() {
     );
   }
 
-  const tree = buildSessionTree(rootSessions);
   const activeSession = rootSessions.find((session) => session.id === selectedSessionId) ?? rootSessions[0];
-  const canvasSessions = activeSession ? [activeSession, ...childSessions] : [];
+  const tree = buildSessionTree(activeSession ? [activeSession, ...descendants] : rootSessions);
+  const canvasSessions = activeSession ? [activeSession, ...descendants] : [];
 
   return (
     <div className="app-shell">

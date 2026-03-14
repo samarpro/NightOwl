@@ -53,7 +53,18 @@ function SessionTreeItem({ session, selectedSessionId, onSelectSession }: Sessio
           </span>
         </div>
       </button>
-      
+      {session.children.length > 0 && (
+        <div className="tree__children">
+          {session.children.map((child) => (
+            <SessionTreeItem
+              key={child.id}
+              onSelectSession={onSelectSession}
+              selectedSessionId={selectedSessionId}
+              session={child}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

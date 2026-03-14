@@ -303,6 +303,14 @@ a {
   gap: 10px;
 }
 
+.tree__children {
+  display: grid;
+  gap: 8px;
+  padding-left: 20px;
+  margin-top: 8px;
+  border-left: 1px solid var(--line);
+}
+
 .session-card,
 .intent-card,
 .approval-card,

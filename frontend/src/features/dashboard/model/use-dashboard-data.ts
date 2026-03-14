@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useDashboardSessionStream } from "features/dashboard/model/use-dashboard-session-stream";
 import type { SessionNode } from "entities/session/model/types";
-import { fetchChildSessions, fetchRootSessions } from "shared/api/sessions";
+import { fetchChildSessions, fetchDescendants, fetchRootSessions } from "shared/api/sessions";
 
 const EMPTY_SESSIONS: SessionNode[] = [];
 
@@ -14,6 +14,12 @@ export function useDashboardData(selectedSessionId: string | null) {
   const childSessionsQuery = useQuery({
     queryKey: ["sessions", "children", selectedSessionId],
     queryFn: () => fetchChildSessions(selectedSessionId as string),
+    enabled: selectedSessionId !== null
+  });
+
+  const descendantsQuery = useQuery({
+    queryKey: ["sessions", "descendants", selectedSessionId],
+    queryFn: () => fetchDescendants(selectedSessionId as string),
     enabled: selectedSessionId !== null
   });
 
@@ -38,9 +44,12 @@ export function useDashboardData(selectedSessionId: string | null) {
   const rootSessionsError = rootSessionsQuery.error ?? websocketError;
   const childSessionsError = childSessionsQuery.error ?? websocketError;
 
+  const descendants = descendantsQuery.data ?? EMPTY_SESSIONS;
+
   return {
     rootSessions,
     childSessions,
+    descendants,
     tasksActive: activeRootCount,
     pendingApprovals: pendingRoots,
     liveChannels: routedChannels.size,

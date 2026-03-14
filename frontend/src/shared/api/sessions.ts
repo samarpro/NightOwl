@@ -17,6 +17,11 @@ export async function fetchChildSessions(parentId: string) {
   return parseSessionResponse(response);
 }
 
+export async function fetchDescendants(rootId: string) {
+  const response = await fetch(buildApiUrl(`/api/v1/sessions/${rootId}/descendants`));
+  return parseSessionResponse(response);
+}
+
 export async function fetchSessionMessages(sessionId: string) {
   const response = await fetch(buildApiUrl(`/api/v1/sessions/${sessionId}/messages`));
 

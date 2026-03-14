@@ -149,6 +149,40 @@ class SessionStore:
             rows = result.scalars().all()
         return [_serialize_session_row(row) for row in rows]
 
+    async def list_descendants(self, root_id: str) -> list[dict[str, Any]]:
+        """Return all descendants of a root session (full subtree)."""
+        from sqlalchemy import text as sa_text
+
+        query = sa_text("""
+            WITH RECURSIVE tree AS (
+                SELECT * FROM sessions WHERE parent_id = :root_id
+                UNION ALL
+                SELECT s.* FROM sessions s
+                JOIN tree t ON s.parent_id = t.id
+            )
+            SELECT * FROM tree ORDER BY created_at
+        """)
+        async with self._sf() as db:
+            result = await db.execute(query, {"root_id": root_id})
+            rows = result.mappings().all()
+        return [
+            {
+                "id": r["id"],
+                "parentId": r["parent_id"],
+                "role": r["role"],
+                "state": r["state"],
+                "depth": r["depth"],
+                "task": r["task"],
+                "label": r["label"] or r["role"],
+                "sandboxMode": r["sandbox_mode"],
+                "channelRoute": r["channel_route"],
+                "createdAt": r["created_at"].isoformat() if r["created_at"] else None,
+                "completedAt": r["completed_at"].isoformat() if r["completed_at"] else None,
+                "result": r["result"],
+            }
+            for r in rows
+        ]
+
     async def fail_orphaned_children(self) -> int:
         async with self._sf() as db:
             stmt = (
