@@ -25,9 +25,11 @@ export function useDashboardData(selectedSessionId: string | null) {
 
   const fetchedRootSessions = rootSessionsQuery.data ?? EMPTY_SESSIONS;
   const fetchedChildSessions = childSessionsQuery.data ?? EMPTY_SESSIONS;
+  const fetchedDescendants = descendantsQuery.data ?? EMPTY_SESSIONS;
 
   const {
     childSessions,
+    descendants,
     rootSessions,
     websocketError,
     websocketLabel,
@@ -35,7 +37,8 @@ export function useDashboardData(selectedSessionId: string | null) {
   } = useDashboardSessionStream(
     selectedSessionId,
     fetchedRootSessions,
-    fetchedChildSessions
+    fetchedChildSessions,
+    fetchedDescendants,
   );
   const activeStatuses = new Set(["running", "waiting", "blocked"]);
   const activeRootCount = rootSessions.filter((session) => activeStatuses.has(session.status)).length;
@@ -43,8 +46,6 @@ export function useDashboardData(selectedSessionId: string | null) {
   const pendingRoots = rootSessions.filter((session) => session.waitReason !== null).length;
   const rootSessionsError = rootSessionsQuery.error ?? websocketError;
   const childSessionsError = childSessionsQuery.error ?? websocketError;
-
-  const descendants = descendantsQuery.data ?? EMPTY_SESSIONS;
 
   return {
     rootSessions,

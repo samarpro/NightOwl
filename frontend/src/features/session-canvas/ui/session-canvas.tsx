@@ -214,9 +214,9 @@ function SessionCanvasNode({ data }: NodeProps<SessionCanvasNodeData>) {
     >
       <Handle
         className="canvas-node__handle"
-        id="agent-left"
+        id="agent-top"
         isConnectable={false}
-        position={Position.Left}
+        position={Position.Top}
         type="target"
       />
       <span className="canvas-node__icon" aria-hidden="true">
@@ -224,14 +224,13 @@ function SessionCanvasNode({ data }: NodeProps<SessionCanvasNodeData>) {
       </span>
       <div className="canvas-node__content">
         <strong>{data.title}</strong>
-        <p>{data.detail}</p>
-        {data.meta ? <span>{data.meta}</span> : null}
+        {data.status ? <span>{data.status}</span> : null}
       </div>
       <Handle
         className="canvas-node__handle"
-        id="agent-right"
+        id="agent-bottom"
         isConnectable={false}
-        position={Position.Right}
+        position={Position.Bottom}
         type="source"
       />
     </button>
@@ -244,8 +243,8 @@ function SessionCanvasEdge({
   sourceY,
   targetX,
   targetY,
-  sourcePosition = Position.Right,
-  targetPosition = Position.Left,
+  sourcePosition = Position.Bottom,
+  targetPosition = Position.Top,
   markerEnd,
   style
 }: EdgeProps) {

@@ -127,6 +127,9 @@ class SessionManager:
             await self._child_runner(child, self)
         except Exception:
             log.exception("Child session %s failed", child.id)
+            intent_graph = getattr(self, "intent_graph", None)
+            if intent_graph:
+                intent_graph.schedule_processing(child.id)
             await self.complete_session(child.id, "Child session crashed", success=False)
 
     # ── Session lifecycle ─────────────────────────────────────────

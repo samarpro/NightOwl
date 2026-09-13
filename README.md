@@ -1,8 +1,18 @@
-# NightOwl
+# NightOwl 🦉
 
-NightOwl is [OpenClaw](https://github.com/openclaw/openclaw) made safe, observable, and accessible to non-technical users. It keeps OpenClaw's parallel agent swarm model — where the main agent spawns independent child sessions that run concurrently and push results back — but wraps it in human-in-the-loop approvals, real-time observability, and managed infrastructure.
+**Winner — Hack48 2026**
+
+![NightOwl](images/nightowl.jpg)
+
+NightOwl is an agent control plane inspired by [OpenClaw](https://github.com/openclaw/openclaw)'s parallel swarm model. Agents spawn independent child sessions that run concurrently and push results back, but NightOwl adds human-in-the-loop approvals, real-time observability with an intent graph, and managed infrastructure — making autonomous agents safe enough to hand to a team.
 
 Users interact through messaging apps (Telegram, WhatsApp, SMS). Agents coordinate via a session manager, execute tools through Composio's MCP gateway, and run sandboxed CLI/browser/computer-use tasks in ephemeral Docker containers. A web dashboard shows the live session tree, agent activity, and pending approval requests.
+
+![Dashboard](images/sessions.jpg)
+
+| Telegram Chat | Telegram HITL Approval |
+|:-:|:-:|
+| ![Chat](images/chat.jpg) | ![HITL](images/hitl.jpg) |
 
 ## Architecture
 
@@ -27,7 +37,9 @@ Messaging Apps (Telegram, WhatsApp, SMS)
 
 - Python 3.14
 - [PDM](https://pdm-project.org/) package manager
-- Docker (for Redis, and later for sandbox containers)
+- Node.js (for the frontend)
+- Docker (for Redis and sandbox containers)
+- PostgreSQL
 - AWS credentials configured for Bedrock access
 - A Composio API key (for MCP tool integrations)
 
@@ -37,11 +49,16 @@ Messaging Apps (Telegram, WhatsApp, SMS)
 # Start Redis
 docker compose up -d
 
-# Install dependencies
+# Install backend dependencies
 cd app
 pdm install
 
+# Install frontend dependencies
+cd ../frontend
+npm install
+
 # Configure environment
+cd ../app
 cp .env.example .env   # then fill in your keys
 ```
 
@@ -50,6 +67,7 @@ The app reads all configuration from environment variables or a `.env` file in `
 | Variable | Purpose |
 |----------|---------|
 | `BEDROCK_REGION` / `BEDROCK_MODEL` | AWS Bedrock LLM endpoint |
+| `AWS_BEARER_TOKEN_BEDROCK` | Bedrock bearer token auth |
 | `COMPOSIO_API_KEY` | Composio MCP gateway auth |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot API token |
 | `REDIS_URL` | Event bus (defaults to `redis://localhost:6379`) |
@@ -92,8 +110,10 @@ app/nightowl/
 ├── observability/  # Token store, intent classifier, live intent graph
 ├── sandbox/        # Docker sandbox manager + bash/browser/computer-use/file tools
 ├── skills/         # Skill parser, store, loader, and agent tools
+├── skills_library/ # Built-in skill definitions
 ├── models/         # Pydantic data models
 ├── db/             # SQLAlchemy models + Alembic migrations
+├── alembic/        # Database migrations
 ├── config.py       # pydantic-settings configuration
 ├── cli.py          # Interactive CLI chat
 └── main.py         # FastAPI app entrypoint + lifespan wiring

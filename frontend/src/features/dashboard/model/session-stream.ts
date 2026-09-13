@@ -4,22 +4,26 @@ import type { DashboardSessionSnapshotDto, GatewayEventDto } from "shared/api/co
 
 export type DashboardSessionStreamState = {
   childSessions: SessionNode[];
+  descendants: SessionNode[];
   hasSnapshot: boolean;
   rootSessions: SessionNode[];
 };
 
 export const initialDashboardSessionStreamState: DashboardSessionStreamState = {
   childSessions: [],
+  descendants: [],
   hasSnapshot: false,
   rootSessions: []
 };
 
 export function createDashboardSessionStreamStateFromSessions(
   rootSessions: SessionNode[],
-  childSessions: SessionNode[]
+  childSessions: SessionNode[],
+  descendants: SessionNode[] = [],
 ): DashboardSessionStreamState {
   return {
     childSessions,
+    descendants,
     hasSnapshot: true,
     rootSessions
   };
@@ -50,6 +54,10 @@ export function applyDashboardSessionEvent(
           session.parentId === selectedSessionId
             ? upsertSession(state.childSessions, session)
             : state.childSessions,
+        descendants:
+          session.parentId !== null
+            ? upsertSession(state.descendants, session)
+            : state.descendants,
         rootSessions: session.parentId === null ? upsertSession(state.rootSessions, session) : state.rootSessions
       };
     }
@@ -62,6 +70,10 @@ export function applyDashboardSessionEvent(
             session.parentId === selectedSessionId
               ? upsertSession(state.childSessions, session)
               : patchSessionList(state.childSessions, session.id, session),
+          descendants:
+            session.parentId !== null
+              ? upsertSession(state.descendants, session)
+              : patchSessionList(state.descendants, session.id, session),
           rootSessions:
             session.parentId === null
               ? upsertSession(state.rootSessions, session)
@@ -72,6 +84,7 @@ export function applyDashboardSessionEvent(
       return {
         ...state,
         childSessions: patchSessionList(state.childSessions, event.payload.sessionId, event.payload),
+        descendants: patchSessionList(state.descendants, event.payload.sessionId, event.payload),
         rootSessions: patchSessionList(state.rootSessions, event.payload.sessionId, event.payload)
       };
     }
