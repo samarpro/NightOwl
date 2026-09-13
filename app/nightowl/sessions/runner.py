@@ -12,10 +12,9 @@ import stamina
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.bedrock import BedrockConverseModel
-from pydantic_ai.providers.bedrock import BedrockProvider
 from pydantic_graph import End
 
-from nightowl.config import settings
+from nightowl.config import bedrock_provider, settings
 
 logfire.configure(token=settings.logfire_token or None)
 logfire.instrument_pydantic_ai()
@@ -62,11 +61,7 @@ def _build_agent(
     session: Session, system_prompt: str, *, include_tools: bool = True,
 ) -> Agent[AgentState, str]:
     model_name = session.model_override or settings.bedrock_model
-    provider = BedrockProvider(
-        region_name=settings.bedrock_region,
-        api_key=settings.bedrock_api_key or None,
-    )
-    model = BedrockConverseModel(model_name=model_name, provider=provider)
+    model = BedrockConverseModel(model_name=model_name, provider=bedrock_provider())
     agent: Agent[AgentState, str] = Agent(
         model=model,
         system_prompt=system_prompt,
@@ -106,7 +101,7 @@ async def _noop_event(_: dict[str, Any]) -> None:
     pass
 
 
-@stamina.retry(on=_is_transient, attempts=5, wait_initial=1.0, wait_max=30.0, wait_jitter=2.0)
+@stamina.retry(on=_is_transient, attempts=8, wait_initial=2.0, wait_max=60.0, wait_jitter=4.0)
 async def _iter_agent(
     agent: Agent[AgentState, str],
     prompt: str,

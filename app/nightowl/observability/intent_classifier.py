@@ -15,7 +15,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.bedrock import BedrockConverseModel
 from pydantic_ai.providers.bedrock import BedrockProvider
 
-from nightowl.config import settings
+from nightowl.config import bedrock_provider, settings
 from nightowl.models.observability import IntentEdge, IntentNode
 from nightowl.observability.token_store import TokenEntry, TokenType
 
@@ -90,11 +90,7 @@ async def classify_chunk(chunk: list[TokenEntry]) -> ClassifiedIntent:
     text = _format_chunk(chunk)
 
     try:
-        provider = BedrockProvider(
-            region_name=settings.bedrock_region,
-            api_key=settings.bedrock_api_key or None,
-        )
-        model = BedrockConverseModel(model_name=_HAIKU_MODEL, provider=provider)
+        model = BedrockConverseModel(model_name=_HAIKU_MODEL, provider=bedrock_provider())
         agent: Agent[None, ClassifiedIntent] = Agent(
             model=model,
             system_prompt=_CLASSIFIER_PROMPT,

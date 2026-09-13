@@ -491,13 +491,13 @@ a {
 }
 
 .canvas-node {
-  min-width: 320px;
-  max-width: 360px;
+  min-width: 200px;
+  max-width: 260px;
   display: flex;
   position: relative;
-  gap: 12px;
+  gap: 10px;
   align-items: flex-start;
-  padding: 26px;
+  padding: 16px 18px;
   border-radius: 18px;
   border: 1px solid var(--line);
   background: rgba(16, 19, 23, 0.96);

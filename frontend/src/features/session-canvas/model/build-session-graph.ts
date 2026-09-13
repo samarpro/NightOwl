@@ -17,46 +17,83 @@ export type SessionCanvasGraph = {
   edges: Edge[];
 };
 
-const ROOT_X = 72;
-const ROOT_Y = 84;
-const LANE_X_GAP = 560;
+const NODE_WIDTH = 280;
+const H_GAP = 60;
+const V_GAP = 140;
 
+/**
+ * Build a tree layout from a flat list of sessions.
+ * Root is the selected session; every other session is placed
+ * under its parent, recursively.
+ */
 export function buildSessionGraph(
   selectedSessionId: string,
   sessions: SessionNode[],
   onSelectAgent: (sessionId: string) => void,
   onDoubleClickAgent: (sessionId: string) => void,
 ): SessionCanvasGraph {
-  const rootSession = sessions.find((session) => session.id === selectedSessionId);
+  const byId = new Map(sessions.map((s) => [s.id, s]));
+  const childrenOf = new Map<string, SessionNode[]>();
 
-  if (!rootSession) {
+  for (const s of sessions) {
+    const pid = s.parentId ?? "__root__";
+    const list = childrenOf.get(pid) ?? [];
+    list.push(s);
+    childrenOf.set(pid, list);
+  }
+
+  // Sort children by start time
+  for (const list of childrenOf.values()) {
+    list.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  }
+
+  const root = byId.get(selectedSessionId);
+  if (!root) {
     return { nodes: [], edges: [] };
   }
 
-  const childSessions = sessions
-    .filter((session) => session.parentId === selectedSessionId)
-    .sort((left, right) => left.startedAt.localeCompare(right.startedAt));
-
-  const orderedSessions = [rootSession, ...childSessions];
   const nodes: Node<SessionCanvasNodeData>[] = [];
   const edges: Edge[] = [];
-  orderedSessions.forEach((session, sessionIndex) => {
-    const laneX = ROOT_X + sessionIndex * LANE_X_GAP;
-    nodes.push(createSessionNode(session, { x: laneX, y: ROOT_Y }, onSelectAgent, onDoubleClickAgent));
 
-    if (session.parentId === selectedSessionId) {
+  // Compute subtree widths for centering
+  function subtreeWidth(id: string): number {
+    const kids = childrenOf.get(id) ?? [];
+    if (kids.length === 0) return NODE_WIDTH;
+    const total = kids.reduce((sum, kid) => sum + subtreeWidth(kid.id), 0);
+    return total + H_GAP * (kids.length - 1);
+  }
+
+  function layout(session: SessionNode, x: number, y: number) {
+    nodes.push(createSessionNode(session, { x, y }, onSelectAgent, onDoubleClickAgent));
+
+    const kids = childrenOf.get(session.id) ?? [];
+    if (kids.length === 0) return;
+
+    const totalWidth = subtreeWidth(session.id);
+    let cursorX = x - totalWidth / 2 + NODE_WIDTH / 2;
+    const childY = y + V_GAP;
+
+    for (const kid of kids) {
+      const kidWidth = subtreeWidth(kid.id);
+      const kidX = cursorX + kidWidth / 2 - NODE_WIDTH / 2;
+      layout(kid, kidX, childY);
+
       edges.push({
-        id: `edge:${selectedSessionId}->${session.id}`,
-        source: `agent:${selectedSessionId}`,
-        sourceHandle: "agent-right",
-        target: `agent:${session.id}`,
-        targetHandle: "agent-left",
+        id: `edge:${session.id}->${kid.id}`,
+        source: `agent:${session.id}`,
+        sourceHandle: "agent-bottom",
+        target: `agent:${kid.id}`,
+        targetHandle: "agent-top",
         type: "sessionCanvasEdge",
         label: "child",
-        animated: session.status === "running"
+        animated: kid.status === "running",
       });
+
+      cursorX += kidWidth + H_GAP;
     }
-  });
+  }
+
+  layout(root, 400, 60);
 
   return { nodes, edges };
 }
@@ -71,8 +108,8 @@ function createSessionNode(
     id: `agent:${session.id}`,
     type: "sessionCanvasNode",
     position,
-    sourcePosition: Position.Right,
-    targetPosition: Position.Left,
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
     data: {
       sessionId: session.id,
       kind: "agent",

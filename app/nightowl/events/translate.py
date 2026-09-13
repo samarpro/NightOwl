@@ -218,7 +218,7 @@ def translate_runtime_event(raw: dict[str, Any]) -> RuntimeEvent | None:
     if raw_type == "intent:update":
         return RuntimeEvent(
             event_id=f"event:{uuid.uuid4().hex[:12]}",
-            event_type="intent.update",
+            event_type="intent.updated",
             occurred_at=datetime.now(UTC),
             session_id=raw.get("session_id"),
             payload={

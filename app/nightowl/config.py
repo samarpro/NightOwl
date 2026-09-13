@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # AWS Bedrock
     bedrock_region: str = "ap-southeast-2"
     bedrock_model: str = "au.anthropic.claude-haiku-4-5-20251001-v1:0"
-    bedrock_api_key: str = ""
+    aws_bearer_token_bedrock: str = ""
 
     # Logfire
     logfire_token: str = ""
@@ -32,8 +32,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://localhost:5432/nightowl"
 
     # Session limits
-    max_spawn_depth: int = 3
-    max_children_per_session: int = 5
+    max_spawn_depth: int = 1
+    max_children_per_session: int = 3
+    max_concurrent_bedrock_calls: int = 3
     hitl_timeout_seconds: int = 120
 
     # Server
@@ -43,3 +44,33 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def bedrock_provider():
+    """Build a BedrockProvider with aggressive retry config (20 attempts, adaptive mode).
+
+    Since the env var is now AWS_BEARER_TOKEN_BEDROCK, botocore picks up
+    bearer token auth natively — we just build the client directly with retries.
+    """
+    import os
+
+    import boto3
+    from botocore.config import Config
+    from pydantic_ai.providers.bedrock import BedrockProvider
+
+    # Ensure botocore sees the bearer token from .env
+    token = settings.aws_bearer_token_bedrock
+    if token:
+        os.environ.setdefault("AWS_BEARER_TOKEN_BEDROCK", token)
+
+    retry_config = Config(
+        retries={"max_attempts": 20, "mode": "adaptive"},
+        read_timeout=300,
+        connect_timeout=60,
+    )
+    client = boto3.client(
+        "bedrock-runtime",
+        region_name=settings.bedrock_region,
+        config=retry_config,
+    )
+    return BedrockProvider(bedrock_client=client)

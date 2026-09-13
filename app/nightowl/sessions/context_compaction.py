@@ -1,9 +1,8 @@
 """Context compaction — proactive summarization when history approaches the context window.
 
-Adapted from the Atlastix agent factory pattern. Uses a history_processor hook
-that PydanticAI calls before every model request. When estimated tokens exceed
-70% of the context window, old messages are summarized by a dedicated agent
-and replaced with a compact summary.
+Uses a history_processor hook that PydanticAI calls before every model request.
+When estimated tokens exceed 75% of the context window, old messages are
+summarized by a dedicated agent and replaced with a compact summary.
 
 Also provides tool result truncation to prevent single responses from blowing
 up the context (e.g. a full Gmail inbox dump).
@@ -36,10 +35,10 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 CONTEXT_WINDOW = 200_000  # Haiku / Sonnet default
-COMPACTION_TRIGGER_RATIO = 0.70
-COMPACTION_TARGET_RATIO = 0.40
+COMPACTION_TRIGGER_RATIO = 0.75
+COMPACTION_TARGET_RATIO = 0.35
 CHARS_PER_TOKEN = 4
-MIN_MESSAGES_TO_COMPACT = 6
+MIN_MESSAGES_TO_COMPACT = 8
 MAX_TOOL_RESULT_CHARS = 20_000  # truncate individual tool results beyond this
 
 # ---------------------------------------------------------------------------
@@ -166,15 +165,11 @@ def _extract_text(messages: Sequence[ModelMessage]) -> str:
 async def summarise_messages(messages: Sequence[ModelMessage]) -> list[ModelMessage]:
     """Summarise old messages into a compact 2-message history pair."""
     from pydantic_ai.models.bedrock import BedrockConverseModel
-    from pydantic_ai.providers.bedrock import BedrockProvider
+    from nightowl.config import bedrock_provider
 
     text_repr = _extract_text(messages)
 
-    provider = BedrockProvider(
-        region_name=settings.bedrock_region,
-        api_key=settings.bedrock_api_key or None,
-    )
-    model = BedrockConverseModel(model_name=settings.bedrock_model, provider=provider)
+    model = BedrockConverseModel(model_name=settings.bedrock_model, provider=bedrock_provider())
     summarizer: Agent[None, str] = Agent(
         model=model,
         system_prompt=SUMMARIZER_SYSTEM_PROMPT,

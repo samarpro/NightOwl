@@ -13,7 +13,8 @@ export type DashboardWebSocketStatus = "connecting" | "open" | "closed" | "error
 export function useDashboardSessionStream(
   selectedSessionId: string | null,
   rootSessions: SessionNode[],
-  childSessions: SessionNode[]
+  childSessions: SessionNode[],
+  descendants: SessionNode[] = [],
 ) {
   const socketRef = useRef<WebSocket | null>(null);
   const selectedSessionIdRef = useRef<string | null>(selectedSessionId);
@@ -24,8 +25,8 @@ export function useDashboardSessionStream(
   selectedSessionIdRef.current = selectedSessionId;
 
   useEffect(() => {
-    setState(createDashboardSessionStreamStateFromSessions(rootSessions, childSessions));
-  }, [childSessions, rootSessions]);
+    setState(createDashboardSessionStreamStateFromSessions(rootSessions, childSessions, descendants));
+  }, [childSessions, descendants, rootSessions]);
 
   useEffect(() => {
     let isMounted = true;
@@ -123,6 +124,7 @@ export function useDashboardSessionStream(
 
   return {
     childSessions: state.childSessions,
+    descendants: state.descendants,
     rootSessions: state.rootSessions,
     websocketError: error,
     websocketLabel,
