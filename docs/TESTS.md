@@ -66,6 +66,7 @@ api/nightowl/
 │       ├── __init__.py
 │       ├── conftest.py             # shared fixtures for this package
 │       ├── test_manager.py
+│       ├── test_runner.py          # orchestration logic (mocked agent, no Bedrock)
 │       ├── test_depth.py
 │       ├── test_prompt_builder.py
 │       ├── test_tools.py
@@ -165,4 +166,3 @@ The following modules have no tests yet. When adding features to these, tests ar
 | `cli.py` | CLI entrypoint — test argument parsing, not Bedrock calls |
 | `db.py` | Database layer — test against real DB, not mocks |
 | `main.py` | FastAPI app — test route handlers with `httpx.AsyncClient` |
-| `sessions/runner.py` | Session execution — unit tests for orchestration logic, integration tests for Bedrock |
